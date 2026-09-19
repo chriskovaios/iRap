@@ -1932,18 +1932,19 @@ addEventListener('keydown', resetIdle);
 
 /* ============================================================
    Persistence: drafts (sync), disk writes (queued), snapshots
+   Keys are folder-relative paths ("verse/Hook.txt"), so same-named files in different folders never collide.
    ============================================================ */
 let draftTimer = null, saveTimer = null, saveDeadline = 0, retryTimer = null;
 function scheduleDraft() { if (draftTimer) return; draftTimer = setTimeout(() => { draftTimer = null; saveDraftNow(); }, 250); }
 function saveDraftNow() {
   clearTimeout(draftTimer); draftTimer = null;
   const d = state.doc; if (!d || !FS.folderId) return;
-  if (d.dirty) Drafts.set(d.name, d.text); else Drafts.clear(d.name);
+  if (d.dirty) Drafts.set(d.rel, d.text); else Drafts.clear(d.rel);
 }
-function enqueue(name, fn) {
-  const prev = state.queues.get(name) || Promise.resolve();
+function enqueue(key, fn) {
+  const prev = state.queues.get(key) || Promise.resolve();
   const p = prev.then(fn, fn).catch(e => console.warn(e));
-  state.queues.set(name, p);
+  state.queues.set(key, p);
   return p;
 }
 function scheduleSave(immediate) {
@@ -1958,7 +1959,7 @@ function flushSave() {
   cancelSave();
   const d = state.doc;
   if (!d || !d.dirty) return Promise.resolve();
-  return enqueue(d.name, () => saveDoc(d));
+  return enqueue(d.rel, () => saveDoc(d));
 }
 async function saveDoc(d) {
   if (!d.dirty) return;
@@ -1969,27 +1970,27 @@ async function saveDoc(d) {
     if (f.lastModified !== d.modified) {
       // Changed outside the app since we read it: keep that version in History, then write ours.
       const ext = await FS.read(d.handle);
-      if (ext.text !== d.savedText && ext.text !== text) await Snapshots.add(d.name, ext.text, 'external');
+      if (ext.text !== d.savedText && ext.text !== text) await Snapshots.add(d.rel, ext.text, 'external');
     }
-    if (d.savedText && d.savedText !== text) await Snapshots.add(d.name, d.savedText, 'save');
+    if (d.savedText && d.savedText !== text) await Snapshots.add(d.rel, d.savedText, 'save');
     await FS.write(d.handle, text, d);
     const f2 = await d.handle.getFile();
     d.modified = f2.lastModified; d.savedText = text; d.dirty = d.text !== text; d.lastSaved = Date.now();
-    if (!d.dirty) Drafts.clear(d.name); else if (d === state.doc) scheduleSave();
+    if (!d.dirty) Drafts.clear(d.rel); else if (d === state.doc) scheduleSave();
     if (state.paused) { state.paused = false; el.banner.hidden = true; }
     if (d === state.doc) setStatus(`Saved · ${fmtClock(d.lastSaved)}`);
-    touchFile(d.name, d.modified, text);
-    broadcast({ type: 'saved', name: d.name, modified: d.modified });
+    touchFile(d.rel, d.modified, text);
+    broadcast({ type: 'saved', rel: d.rel, modified: d.modified });
   } catch (e) { onSaveError(e, d); }
 }
 function onSaveError(e, d) {
   console.warn('Save failed', e);
-  Drafts.set(d.name, d.text);
+  Drafts.set(d.rel, d.text);
   if (isPermissionError(e)) { state.paused = true; el.banner.hidden = false; if (d === state.doc) setStatus('Saving paused · edits kept'); }
-  else if (e && e.name === 'NotFoundError' && FS.handle) {
+  else if (e && e.name === 'NotFoundError' && d.dir) {
     // The file vanished from the folder while open: recreate it so the text is not lost.
     if (d === state.doc) setStatus('File was missing · recreating');
-    FS.handle.getFileHandle(d.name, { create: true }).then(async h => {
+    d.dir.getFileHandle(d.name, { create: true }).then(async h => {
       d.handle = h; d.modified = (await h.getFile()).lastModified; d.savedText = ''; d.dirty = true;
       if (d === state.doc) scheduleSave(true);
       await refreshList();
@@ -2026,61 +2027,114 @@ el.ta.addEventListener('input', () => {
   d.text = el.ta.value; d.dirty = d.text !== d.savedText;
   caretDirty = true; queueRender(); scheduleDraft();
   if (d.dirty) { setStatus(''); scheduleSave(); }
-  else { cancelSave(); Drafts.clear(d.name); setStatus(d.lastSaved ? `Saved · ${fmtClock(d.lastSaved)}` : `Saved · ${fmtDate(d.modified)}`); }
+  else { cancelSave(); Drafts.clear(d.rel); setStatus(d.lastSaved ? `Saved · ${fmtClock(d.lastSaved)}` : `Saved · ${fmtDate(d.modified)}`); }
 });
 el.ta.addEventListener('keyup', e => { if (/^(Arrow|Page|Home|End)/.test(e.key)) requestAnimationFrame(ensureCaretVisible); });
 
 /* ============================================================
-   Files: list, open, reconcile, create, rename, duplicate, trash
+   Files and folders: browse, open, reconcile, create, rename, move, duplicate, trash
    ============================================================ */
+const isRoot = () => state.path.length === 0;
+const relOf = (name, path = state.path) => path.concat(name).join('/');
+const relDir = rel => rel.split('/').slice(0, -1);
+const relName = rel => rel.split('/').pop();
+const pathLabel = path => path.length ? path.join(' › ') : 'Lyrics';
+const samePath = (a, b) => a.join('/') === b.join('/');
+const pathKey = () => `lyr:path:${FS.folderId}`;
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
 function handleFsError(e) {
   console.warn(e);
   if (!e || e.name === 'AbortError') return;
   if (isPermissionError(e)) { if (state.files.length || state.doc) { state.paused = true; el.banner.hidden = false; } else showScreen('reconnect'); }
   else toast(e.message || 'Something went wrong', 3500);
 }
+function validFolderName(raw) {
+  const n = String(raw || '').trim();
+  if (!n || n.startsWith('.') || /[<>:"/\\|?*]/.test(n) || Array.from(n).some(c => c.charCodeAt(0) < 32)) return null;
+  if (/[. ]$/.test(n) || /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(n) || (isRoot() && n.toLowerCase() === 'trash')) return null;
+  return n;
+}
 function sortFiles() {
-  if (settings.sort === 'name') { const c = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }); state.files.sort((a, b) => c.compare(a.name, b.name)); }
+  state.folders.sort((a, b) => collator.compare(a.name, b.name));
+  if (settings.sort === 'name') state.files.sort((a, b) => collator.compare(a.name, b.name));
   else state.files.sort((a, b) => b.modified - a.modified);
 }
 async function loadSnippets() {
   for (const f of state.files) {
-    const c = state.snippets.get(f.name);
+    const c = state.snippets.get(f.rel);
     if (c && c.modified === f.modified) continue;
     try {
       const file = await f.handle.getFile();
       const head = (await file.slice(0, 600).text()).replace(/^﻿/, '');
-      state.snippets.set(f.name, { modified: f.modified, text: head.split(/\r?\n/).map(s => s.trim()).find(Boolean) || '' });
-    } catch { state.snippets.set(f.name, { modified: f.modified, text: '' }); }
+      state.snippets.set(f.rel, { modified: f.modified, text: head.split(/\r?\n/).map(s => s.trim()).find(Boolean) || '' });
+    } catch { state.snippets.set(f.rel, { modified: f.modified, text: '' }); }
   }
 }
-function touchFile(name, modified, text) {
-  const f = state.files.find(x => x.name === name); if (!f) return;
+function touchFile(rel, modified, text) {
+  const f = state.files.find(x => x.rel === rel); if (!f) return;
   f.modified = modified;
-  state.snippets.set(name, { modified, text: text.split('\n').map(s => s.trim()).find(Boolean) || '' });
+  state.snippets.set(rel, { modified, text: text.split('\n').map(s => s.trim()).find(Boolean) || '' });
   sortFiles(); renderList();
+}
+
+// Enter a folder path (array of names) below the granted root. Unknown segments stop the walk.
+async function navigate(path) {
+  let dir = FS.handle; const ok = [];
+  for (const seg of path || []) { try { dir = await dir.getDirectoryHandle(seg); ok.push(seg); } catch { break; } }
+  state.path = ok; state.dir = dir; state.tree = null;
+  if (state.filter) { state.filter = ''; el.search.value = ''; }
+  LS.set(pathKey(), ok);
+  await refreshList();
+  el.listScroll.scrollTop = 0;
+}
+async function refreshList() {
+  if (!FS.handle) return;
+  if (!state.dir) state.dir = FS.handle;
+  try {
+    const [files, folders, trash] = await Promise.all([FS.listDir(state.dir), FS.listSubdirs(state.dir, isRoot()), isRoot() ? FS.listTrash() : Promise.resolve([])]);
+    for (const f of files) { f.rel = relOf(f.name); f.path = state.path.slice(); f.dir = state.dir; }
+    await Promise.all(folders.map(async d => { d.count = await FS.countTxt(d.handle); }));
+    state.files = files; state.folders = folders; state.trash = trash;
+  } catch (e) { handleFsError(e); return; }
+  state.tree = null;
+  sortFiles(); await loadSnippets(); renderList();
+}
+let treeLoading = false;
+async function ensureTree() {
+  if (state.tree || treeLoading || !FS.handle) return;
+  treeLoading = true;
+  const out = [];
+  try { await FS.walk(FS.handle, [], out); } catch (e) { console.warn(e); }
+  treeLoading = false;
+  state.tree = out.sort((a, b) => b.modified - a.modified);
+  renderList();
 }
 function renderList() {
   const q = state.filter.trim().toLowerCase();
-  const snip = n => (state.snippets.get(n) || {}).text || '';
-  const files = state.files.filter(f => !q || stem(f.name).toLowerCase().includes(q) || snip(f.name).toLowerCase().includes(q));
-  el.fileList.innerHTML = files.map(f => {
-    const active = state.doc && state.doc.name === f.name;
-    return `<li class="cell${active ? ' active' : ''}" data-name="${esc(f.name)}" role="button" tabindex="0"><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>${esc(snip(f.name) || 'No additional text')}</div></div></li>`;
-  }).join('');
-  el.listEmpty.hidden = files.length > 0;
-  el.listEmpty.textContent = state.files.length ? 'No matches' : 'No lyrics yet. Tap + to start one.';
-  el.trashGroup.hidden = state.trash.length === 0;
+  el.sideTitle.textContent = isRoot() ? 'Lyrics' : state.path[state.path.length - 1];
+  el.btnUp.hidden = isRoot();
+  el.btnUp.lastElementChild.textContent = state.path.length > 1 ? state.path[state.path.length - 2] : 'Lyrics';
+  const snip = rel => (state.snippets.get(rel) || {}).text || '';
+  const fileCell = (f, sub) => `<li class="cell${state.doc && state.doc.rel === f.rel ? ' active' : ''}" data-rel="${esc(f.rel)}" role="button" tabindex="0" draggable="true"><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>${esc(sub)}</div></div></li>`;
+  if (q) {
+    const hits = (state.tree || []).filter(f => stem(f.name).toLowerCase().includes(q) || snip(f.rel).toLowerCase().includes(q));
+    el.fileList.innerHTML = hits.map(f => fileCell(f, pathLabel(f.path))).join('');
+    el.listEmpty.hidden = hits.length > 0;
+    el.listEmpty.textContent = state.tree ? 'No matches' : 'Searching…';
+    el.trashGroup.hidden = true;
+    return;
+  }
+  const folders = state.folders.map(d => `<li class="cell folder" data-dir="${esc(d.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl">${esc(d.name)}</div><div class="sub">${plural(d.count, 'lyric')}</div></div><span class="ico chev">${ICONS.chev}</span></li>`).join('');
+  const files = state.files.map(f => fileCell(f, snip(f.rel) || 'No additional text')).join('');
+  el.fileList.innerHTML = folders + files;
+  el.listEmpty.hidden = !!(folders || files);
+  el.listEmpty.textContent = isRoot() ? 'No lyrics yet. Tap + to start one.' : 'This folder is empty.';
+  el.trashGroup.hidden = !isRoot() || state.trash.length === 0;
   el.trashCount.textContent = state.trash.length ? `(${state.trash.length})` : '';
   el.trashList.hidden = !state.trashOpen; el.btnEmptyTrash.hidden = !state.trashOpen;
   el.trashToggle.setAttribute('aria-expanded', String(state.trashOpen));
   el.trashList.innerHTML = state.trash.map(f => `<li class="cell" data-trash="${esc(f.name)}" role="button" tabindex="0"><span class="ico">${ICONS.trash}</span><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>Tap to restore or delete forever</div></div></li>`).join('');
-}
-async function refreshList() {
-  if (!FS.handle) return;
-  try { state.files = await FS.list(); state.trash = await FS.listTrash(); }
-  catch (e) { handleFsError(e); return; }
-  sortFiles(); await loadSnippets(); renderList();
 }
 function closeDoc() {
   state.doc = null; cancelSave(); AutoScroll.stop();
@@ -2088,25 +2142,32 @@ function closeDoc() {
   setStatus(''); el.counts.textContent = ''; el.mirror.innerHTML = ''; el.gutter.innerHTML = ''; el.reader.innerHTML = ''; el.ta.value = '';
   renderList(); showList();
 }
-async function openByName(name, opts) { const entry = state.files.find(f => f.name === name); if (entry) await openFile(entry, opts); }
+// Open by relative path, entering its folder first when needed.
+async function openRel(rel, opts) {
+  if (!rel) return;
+  const dirPath = relDir(rel);
+  if (!samePath(dirPath, state.path)) await navigate(dirPath);
+  const entry = state.files.find(f => f.rel === rel);
+  if (entry) await openFile(entry, opts);
+}
 async function openFile(entry, opts = {}) {
-  if (state.doc && state.doc.name === entry.name && !opts.force) { showDoc(); if (state.editing && innerWidth > 760) el.ta.focus(); return; }
+  if (state.doc && state.doc.rel === entry.rel && !opts.force) { showDoc(); if (state.editing && innerWidth > 760) el.ta.focus(); return; }
   if (state.doc && !opts.force) Bindings.saveState(state.doc);
   if (!opts.force) { Loops.save(Player.current()); Player.pauseAll(); YT.destroy(); Player.render(); }
   saveDraftNow(); await flushSave();
   let disk;
   try { disk = await FS.read(entry.handle); } catch (e) { handleFsError(e); return; }
-  const draft = Drafts.get(entry.name);
+  const draft = Drafts.get(entry.rel);
   let text = disk.text, restored = false;
   if (draft && draft.text !== disk.text) {
     if ((draft.time || 0) > disk.modified) {
-      if (disk.text.trim()) await Snapshots.add(entry.name, disk.text, 'disk');
+      if (disk.text.trim()) await Snapshots.add(entry.rel, disk.text, 'disk');
       text = draft.text; restored = true;
-    } else { await Snapshots.add(entry.name, draft.text, 'draft'); Drafts.clear(entry.name); }
-  } else if (draft) Drafts.clear(entry.name);
+    } else { await Snapshots.add(entry.rel, draft.text, 'draft'); Drafts.clear(entry.rel); }
+  } else if (draft) Drafts.clear(entry.rel);
   const prevScroll = el.doc.scrollTop, prevSel = [el.ta.selectionStart, el.ta.selectionEnd];
-  state.doc = { name: entry.name, handle: entry.handle, text, savedText: disk.text, bom: disk.bom, eol: disk.eol, modified: disk.modified, dirty: restored, lastSaved: 0 };
-  LS.set(lastKey(), entry.name);
+  state.doc = { name: entry.name, rel: entry.rel, path: (entry.path || state.path).slice(), dir: entry.dir || state.dir, handle: entry.handle, text, savedText: disk.text, bom: disk.bom, eol: disk.eol, modified: disk.modified, dirty: restored, lastSaved: 0 };
+  LS.set(lastKey(), entry.rel);
   el.ta.value = text;
   el.docInner.hidden = false; el.emptyDoc.hidden = true; el.docTitle.textContent = stem(entry.name);
   renderMirror(); renderReader(); setEditing(state.editing, true);
@@ -2122,22 +2183,25 @@ async function reconcileDrafts() {
   const drafts = Drafts.all(); if (!drafts.length) return;
   let restored = 0;
   for (const dr of drafts) {
-    if (state.doc && state.doc.name === dr.name) continue;
-    const entry = state.files.find(f => f.name === dr.name);
+    const rel = dr.name;
+    if (!rel || rel.startsWith('Trash/')) continue;
+    if (state.doc && state.doc.rel === rel) continue;
     try {
-      if (!entry) {
-        if (!dr.text.trim()) { Drafts.clear(dr.name); continue; }
-        const h = await FS.handle.getFileHandle(dr.name, { create: true });
+      const src = await FS.resolveFile(rel);
+      if (!src) {
+        if (!dr.text.trim()) { Drafts.clear(rel); continue; }
+        let dir; try { dir = await FS.getDir(relDir(rel), true); } catch { dir = FS.handle; }
+        const h = await dir.getFileHandle(relName(rel), { create: true });
         await FS.write(h, dr.text, { bom: false, eol: '\n' });
-        Drafts.clear(dr.name); restored++; continue;
+        Drafts.clear(rel); restored++; continue;
       }
-      const disk = await FS.read(entry.handle);
-      if (disk.text === dr.text) { Drafts.clear(dr.name); continue; }
+      const disk = await FS.read(src.handle);
+      if (disk.text === dr.text) { Drafts.clear(rel); continue; }
       if ((dr.time || 0) > disk.modified) {
-        if (disk.text.trim()) await Snapshots.add(dr.name, disk.text, 'disk');
-        await FS.write(entry.handle, dr.text, disk);
-        Drafts.clear(dr.name); restored++;
-      } else { await Snapshots.add(dr.name, dr.text, 'draft'); Drafts.clear(dr.name); }
+        if (disk.text.trim()) await Snapshots.add(rel, disk.text, 'disk');
+        await FS.write(src.handle, dr.text, disk);
+        Drafts.clear(rel); restored++;
+      } else { await Snapshots.add(rel, dr.text, 'draft'); Drafts.clear(rel); }
     } catch (e) {
       if (isPermissionError(e)) { state.paused = true; el.banner.hidden = false; return; }
       console.warn(e);
@@ -2149,23 +2213,100 @@ async function enterFolder() {
   hideScreen(); state.paused = false; el.banner.hidden = true;
   el.folderName.textContent = FS.handle.name; el.setFolderName.textContent = FS.handle.name;
   closeDoc();
-  await refreshList();
-  await reconcileDrafts();
+  state.dir = FS.handle; state.path = [];
   const last = LS.get(lastKey(), null);
-  const target = (last && state.files.find(f => f.name === last)) || (innerWidth > 760 ? state.files[0] : null);
+  const savedPath = LS.get(pathKey(), []);
+  await navigate(typeof last === 'string' && last ? relDir(last) : (Array.isArray(savedPath) ? savedPath : []));
+  await reconcileDrafts();
+  const target = (typeof last === 'string' && state.files.find(f => f.rel === last)) || (innerWidth > 760 ? state.files[0] : null);
   if (target) await openFile(target); else showList();
+}
+
+// Re-key everything stored about a lyric when its path changes (rename, move, trash, restore).
+async function rekey(oldRel, newRel, draftText) {
+  if (oldRel === newRel) return;
+  if (Drafts.get(oldRel)) Drafts.clear(oldRel);
+  if (draftText != null) Drafts.set(newRel, draftText);
+  await Snapshots.rename(oldRel, newRel);
+  await Bindings.rename(oldRel, newRel);
+  state.snippets.delete(oldRel);
+  const last = LS.get(lastKey(), null); if (last === oldRel) LS.set(lastKey(), newRel);
+}
+// Same, for everything under a folder that was renamed.
+async function rekeyPrefix(oldPath, newPath) {
+  const oldP = `${FS.folderId}/${oldPath.join('/')}/`, newP = `${FS.folderId}/${newPath.join('/')}/`;
+  const hi = oldP + String.fromCharCode(0xFFFF);
+  try {
+    for (const b of (await DB.bindingsInRange(oldP, hi)) || []) { await DB.delBinding(b.key); b.key = newP + b.key.slice(oldP.length); b.name = b.key.slice(FS.folderId.length + 1); await DB.putBinding(b); }
+    for (const s of (await DB.snapsInRange(oldP, hi)) || []) { s.file = newP + s.file.slice(oldP.length); s.name = s.file.slice(FS.folderId.length + 1); await DB.putSnap(s); }
+  } catch (e) { console.warn(e); }
+  Bindings.cache.clear(); Snapshots.last.clear();
+  try {
+    const dp = `lyr:draft:${FS.folderId}/${oldPath.join('/')}/`, np = `lyr:draft:${FS.folderId}/${newPath.join('/')}/`;
+    const keys = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(dp)) keys.push(k); }
+    for (const k of keys) { const v = localStorage.getItem(k); localStorage.removeItem(k); localStorage.setItem(np + k.slice(dp.length), v); }
+  } catch { /* ignore */ }
+  const last = LS.get(lastKey(), null);
+  if (typeof last === 'string' && last.startsWith(oldPath.join('/') + '/')) LS.set(lastKey(), newPath.join('/') + '/' + last.slice(oldPath.join('/').length + 1));
 }
 async function createFile() {
   if (!FS.handle) return;
   saveDraftNow(); await flushSave();
   try {
-    const name = await FS.uniqueName(FS.handle, 'Untitled.txt');
-    const h = await FS.handle.getFileHandle(name, { create: true });
+    const dir = state.dir, path = state.path.slice();
+    const name = await FS.uniqueName(dir, 'Untitled.txt');
+    const h = await dir.getFileHandle(name, { create: true });
     await FS.write(h, '', { bom: false, eol: '\n' });
     await refreshList(); broadcast({ type: 'list' });
-    await openByName(name);
+    await openRel(relOf(name, path));
     if (!state.editing) setEditing(true);
     el.ta.focus();
+  } catch (e) { handleFsError(e); }
+}
+async function createFolder() {
+  if (!FS.handle) return;
+  const val = await alertPrompt({ title: 'New Folder', message: 'Name the folder.', placeholder: 'Folder name', ok: 'Create' });
+  if (val == null) return;
+  const name = validFolderName(val);
+  if (!name) { toast('That name can’t be used'); return; }
+  try {
+    if (await FS.existsDir(state.dir, name) || await FS.exists(state.dir, name)) { toast('Something with that name already exists'); return; }
+    await state.dir.getDirectoryHandle(name, { create: true });
+    await refreshList(); broadcast({ type: 'list' });
+    toast(`Folder “${name}” created`, 1400);
+  } catch (e) { handleFsError(e); }
+}
+async function renameFolder(name) {
+  const val = await alertPrompt({ title: 'Rename Folder', value: name, ok: 'Rename' });
+  if (val == null) return;
+  const newName = validFolderName(val);
+  if (!newName) { toast('That name can’t be used'); return; }
+  if (newName === name) return;
+  try {
+    if (newName.toLowerCase() !== name.toLowerCase() && (await FS.existsDir(state.dir, newName) || await FS.exists(state.dir, newName))) { toast('Something with that name already exists'); return; }
+    const oldPath = state.path.concat(name), newPath = state.path.concat(newName);
+    if (state.doc && state.doc.path.length > state.path.length && samePath(state.doc.path.slice(0, oldPath.length), oldPath)) { saveDraftNow(); await flushSave(); closeDoc(); }
+    if (newName.toLowerCase() === name.toLowerCase()) {
+      const tmp = `Renaming ${Date.now()}`;
+      await FS.moveDir(state.dir, name, state.dir, tmp);
+      await FS.moveDir(state.dir, tmp, state.dir, newName);
+    } else await FS.moveDir(state.dir, name, state.dir, newName);
+    await rekeyPrefix(oldPath, newPath);
+    await refreshList(); broadcast({ type: 'list' });
+    toast(`Renamed to “${newName}”`, 1400);
+  } catch (e) { handleFsError(e); }
+}
+async function deleteFolder(name) {
+  try {
+    const dir = await state.dir.getDirectoryHandle(name);
+    let empty = true;
+    for await (const entry of dir.values()) { if (!entry.name.startsWith('.')) { empty = false; break; } }
+    if (!empty) { toast('Move or delete the lyrics inside it first', 2600); return; }
+    const i = await actionSheet({ title: `Delete folder “${name}”?`, message: 'The folder is empty. This cannot be undone.', actions: [{ label: 'Delete Folder', destructive: true }] });
+    if (i !== 0) return;
+    await state.dir.removeEntry(name, { recursive: true });
+    await refreshList(); broadcast({ type: 'list' });
+    toast('Folder deleted', 1400);
   } catch (e) { handleFsError(e); }
 }
 async function renameCurrent() {
@@ -2176,22 +2317,19 @@ async function renameCurrent() {
   if (!name) { toast('That name can’t be used'); return; }
   if (name === d.name) return;
   const caseOnly = name.toLowerCase() === d.name.toLowerCase();
-  if (!caseOnly && await FS.exists(FS.handle, name)) { toast('A lyric with that name already exists'); return; }
+  if (!caseOnly && await FS.exists(d.dir, name)) { toast('A lyric with that name already exists'); return; }
   saveDraftNow(); await flushSave();
   try {
     let h;
     if (caseOnly) {
-      const tmp = await FS.uniqueName(FS.handle, `Renaming ${Date.now()}.txt`);
-      const th = await FS.move(FS.handle, d.handle, FS.handle, tmp);
-      h = await FS.move(FS.handle, th, FS.handle, name);
-    } else h = await FS.move(FS.handle, d.handle, FS.handle, name);
-    const old = d.name;
-    if (Drafts.get(old)) { Drafts.clear(old); if (d.dirty) Drafts.set(name, d.text); }
-    await Snapshots.rename(old, name);
-    await Bindings.rename(old, name);
-    d.name = name; d.handle = h; d.modified = (await h.getFile()).lastModified;
-    state.snippets.delete(old);
-    LS.set(lastKey(), name);
+      const tmp = await FS.uniqueName(d.dir, `Renaming ${Date.now()}.txt`);
+      const th = await FS.move(d.dir, d.handle, d.dir, tmp);
+      h = await FS.move(d.dir, th, d.dir, name);
+    } else h = await FS.move(d.dir, d.handle, d.dir, name);
+    const newRel = relOf(name, d.path);
+    await rekey(d.rel, newRel, d.dirty ? d.text : null);
+    d.name = name; d.rel = newRel; d.handle = h; d.modified = (await h.getFile()).lastModified;
+    LS.set(lastKey(), newRel);
     el.docTitle.textContent = stem(name);
     await refreshList(); broadcast({ type: 'list' });
   } catch (e) { handleFsError(e); }
@@ -2200,13 +2338,37 @@ async function duplicateCurrent() {
   const d = state.doc; if (!d) return;
   saveDraftNow(); await flushSave();
   try {
-    const name = await FS.uniqueName(FS.handle, `${stem(d.name)} copy.txt`);
-    const h = await FS.copyVerified(d.handle, FS.handle, name);
+    const name = await FS.uniqueName(d.dir, `${stem(d.name)} copy.txt`);
+    const h = await FS.copyVerified(d.handle, d.dir, name);
     if (d.dirty) await FS.write(h, d.text, d);
-    await Bindings.copy(d.name, name);
+    const newRel = relOf(name, d.path);
+    await Bindings.copy(d.rel, newRel);
     await refreshList(); broadcast({ type: 'list' });
-    await openByName(name);
+    await openRel(newRel);
     toast(`Duplicated as “${stem(name)}”`);
+  } catch (e) { handleFsError(e); }
+}
+// Move a lyric (by relative path) into another folder of the tree.
+async function moveFile(rel, destPath) {
+  if (!rel || samePath(relDir(rel), destPath)) return;
+  const isOpen = state.doc && state.doc.rel === rel;
+  if (isOpen) { saveDraftNow(); await flushSave(); }
+  try {
+    const src = isOpen ? { dir: state.doc.dir, handle: state.doc.handle, name: state.doc.name } : await FS.resolveFile(rel);
+    if (!src) { toast('That lyric is no longer there'); await refreshList(); return; }
+    const dest = await FS.getDir(destPath, false);
+    const newName = await FS.uniqueName(dest, src.name);
+    const h = await FS.move(src.dir, src.handle, dest, newName);
+    const newRel = relOf(newName, destPath);
+    const draft = Drafts.get(rel);
+    await rekey(rel, newRel, isOpen && state.doc.dirty ? state.doc.text : (draft ? draft.text : null));
+    if (isOpen) {
+      const d = state.doc;
+      d.name = newName; d.rel = newRel; d.path = destPath.slice(); d.dir = dest; d.handle = h; d.modified = (await h.getFile()).lastModified;
+      LS.set(lastKey(), newRel); el.docTitle.textContent = stem(newName);
+    }
+    await refreshList(); broadcast({ type: 'list' });
+    toast(`Moved “${stem(newName)}” to ${pathLabel(destPath)}`, 1800);
   } catch (e) { handleFsError(e); }
 }
 async function trashCurrent() {
@@ -2217,9 +2379,11 @@ async function trashCurrent() {
   try {
     const trash = await FS.getTrash();
     const name = await FS.uniqueName(trash, d.name);
-    if (d.dirty) await Snapshots.add(d.name, d.text, 'draft');
-    await FS.move(FS.handle, d.handle, trash, name);
-    Drafts.clear(d.name); LS.del(lastKey());
+    if (d.dirty) await Snapshots.add(d.rel, d.text, 'draft');
+    await FS.move(d.dir, d.handle, trash, name);
+    await rekey(d.rel, 'Trash/' + name, null);
+    const origins = LS.get('lyr:trash-origin', {}) || {}; origins[name] = d.path.slice(); LS.set('lyr:trash-origin', origins);
+    LS.del(lastKey());
     closeDoc(); await refreshList(); broadcast({ type: 'list' });
     toast('Moved to Recently Deleted');
   } catch (e) { handleFsError(e); }
@@ -2230,12 +2394,23 @@ async function trashActions(name) {
   if (i === null) return;
   try {
     const trash = await FS.getTrash();
+    const origins = LS.get('lyr:trash-origin', {}) || {};
     if (i === 0) {
-      const newName = await FS.uniqueName(FS.handle, name);
-      await FS.move(trash, entry.handle, FS.handle, newName);
+      let destPath = Array.isArray(origins[name]) ? origins[name].slice() : [];
+      let dest; try { dest = await FS.getDir(destPath, false); } catch { dest = FS.handle; destPath = []; }
+      const newName = await FS.uniqueName(dest, name);
+      await FS.move(trash, entry.handle, dest, newName);
+      const newRel = relOf(newName, destPath);
+      await rekey('Trash/' + name, newRel, null);
+      delete origins[name]; LS.set('lyr:trash-origin', origins);
       await refreshList(); broadcast({ type: 'list' });
-      toast(`Restored “${stem(newName)}”`); openByName(newName);
-    } else { await trash.removeEntry(name); await Bindings.remove(name); await refreshList(); broadcast({ type: 'list' }); toast('Deleted forever'); }
+      toast(`Restored “${stem(newName)}” to ${pathLabel(destPath)}`, 2000);
+      openRel(newRel);
+    } else {
+      await trash.removeEntry(name); await Bindings.remove('Trash/' + name);
+      delete origins[name]; LS.set('lyr:trash-origin', origins);
+      await refreshList(); broadcast({ type: 'list' }); toast('Deleted forever');
+    }
   } catch (e) { handleFsError(e); }
 }
 async function emptyTrash() {
@@ -2244,11 +2419,42 @@ async function emptyTrash() {
   if (i !== 0) return;
   try {
     const trash = await FS.getTrash();
-    for (const f of state.trash) { await trash.removeEntry(f.name); await Bindings.remove(f.name); }
+    for (const f of state.trash) { await trash.removeEntry(f.name); await Bindings.remove('Trash/' + f.name); }
+    LS.set('lyr:trash-origin', {});
     await refreshList(); broadcast({ type: 'list' });
     toast('Recently Deleted is empty');
   } catch (e) { handleFsError(e); }
 }
+
+/* Move sheet: browse the tree and pick a destination folder. */
+const MoveUI = {
+  rel: null, path: [],
+  async open(rel) {
+    this.rel = rel; this.path = relDir(rel);
+    el.mvTitle.textContent = `Move “${stem(relName(rel))}”`;
+    Sheet.open('move');
+    await this.render();
+  },
+  async render() {
+    let dir; try { dir = await FS.getDir(this.path, false); } catch { this.path = []; dir = FS.handle; }
+    let folders = [];
+    try { folders = await FS.listSubdirs(dir, this.path.length === 0); } catch (e) { console.warn(e); }
+    folders.sort((a, b) => collator.compare(a.name, b.name));
+    el.mvPath.textContent = pathLabel(this.path);
+    const up = this.path.length ? `<li class="cell" data-mv-up="1" role="button" tabindex="0"><span class="ico">${ICONS.back}</span><div class="txt"><div class="ttl">${esc(this.path.length > 1 ? this.path[this.path.length - 2] : 'Lyrics')}</div></div></li>` : '';
+    el.mvList.innerHTML = up + folders.map(d => `<li class="cell folder" data-mv-dir="${esc(d.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl">${esc(d.name)}</div></div><span class="ico chev">${ICONS.chev}</span></li>`).join('');
+    el.mvEmpty.hidden = !!(up || folders.length);
+    const here = samePath(this.path, relDir(this.rel));
+    el.mvHere.disabled = here;
+    el.mvHere.textContent = here ? 'Already in this folder' : `Move to ${pathLabel(this.path)}`;
+  },
+};
+el.mvList.addEventListener('click', async e => {
+  const up = e.target.closest('[data-mv-up]'), d = e.target.closest('[data-mv-dir]');
+  if (up) { MoveUI.path = MoveUI.path.slice(0, -1); await MoveUI.render(); }
+  else if (d) { MoveUI.path = MoveUI.path.concat(d.dataset.mvDir); await MoveUI.render(); }
+});
+el.mvHere.addEventListener('click', async () => { const rel = MoveUI.rel, dest = MoveUI.path.slice(); Sheet.close(); await moveFile(rel, dest); });
 
 const REASONS = { save: 'Saved version', external: 'Changed outside the app', disk: 'Replaced by restored edits', draft: 'Unsaved draft', restore: 'Before restoring a version' };
 async function renderHistory() {
