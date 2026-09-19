@@ -278,7 +278,8 @@
   .seg { display: inline-flex; background: var(--fill-2); border-radius: 9px; padding: 2px; }
   .seg button { font-size: 13px; font-weight: 500; color: var(--label); background: none; border: 0; padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: background .2s; white-space: nowrap; }
   .seg button[aria-pressed="true"] { background: var(--fill); box-shadow: 0 3px 8px rgba(0,0,0,.12); font-weight: 600; }
-  .seg[data-setting="fontSize"] button:nth-child(1) { font-size: 12px; } .seg[data-setting="fontSize"] button:nth-child(3) { font-size: 16px; }
+  .seg[data-setting="fontSize"] button:nth-child(1) { font-size: 13px; } .seg[data-setting="fontSize"] button:nth-child(2) { font-size: 15px; } .seg[data-setting="fontSize"] button:nth-child(3) { font-size: 18px; }
+  .row .ctl { flex-wrap: wrap; justify-content: flex-end; }
   .stepper { display: inline-flex; align-items: center; background: var(--fill-2); border-radius: 8px; }
   .stepper button { width: 36px; height: 30px; border: 0; background: none; color: var(--label); font-size: 20px; line-height: 1; cursor: pointer; border-radius: 8px; }
   .stepper button:hover { background: var(--fill); }
@@ -454,7 +455,7 @@
         <div class="row"><div class="desc">Colors apply as you pick them.</div><div class="ctl"><button class="small-btn" id="customCopy">Copy Current Look</button></div></div>
       </div>
       <div class="row"><div><div class="lbl">Grain</div><div class="desc">Subtle poster texture</div></div><div class="ctl"><button class="switch" role="switch" data-setting="grain" aria-label="Grain"></button></div></div>
-      <div class="row"><div class="lbl">Text size</div><div class="ctl"><div class="seg" data-setting="fontSize"><button data-value="15">A</button><button data-value="17">A</button><button data-value="19">A</button></div></div></div>
+      <div class="row"><div><div class="lbl">Text size</div><div class="desc">Presets, or step to any size</div></div><div class="ctl"><div class="seg" data-setting="fontSize"><button data-value="18" aria-label="Regular">A</button><button data-value="21" aria-label="Large">A</button><button data-value="25" aria-label="Extra large">A</button></div><div class="stepper" data-setting="fontSize" data-min="12" data-max="40"><button data-step="-1" aria-label="Smaller">−</button><span class="val"></span><button data-step="1" aria-label="Bigger">+</button></div></div></div>
     </div>
 
     <div class="sec-title">Visuals</div>
@@ -653,7 +654,7 @@ $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
    Settings
    ============================================================ */
 const DEFAULTS = {
-  theme: 'system', grain: false, fontSize: 17,
+  theme: 'system', grain: false, fontSize: 18,
   visuals: true, intensity: 60,
   syllables: true, synizesis: true, linesPerBar: 1,
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
