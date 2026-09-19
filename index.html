@@ -166,6 +166,12 @@
   .yt-pane { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: #000; margin: 0 0 12px; }
   .yt-pane[hidden] { display: block; height: 0; aspect-ratio: auto; margin: 0; }
   .yt-pane iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #ytBox[hidden] { display: none; }
+  .yt-fallback { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 20px; text-align: center; background: var(--bg-3); }
+  .yt-fallback[hidden] { display: none; }
+  .yt-fb-title { font-size: 17px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .yt-fb-msg { font-size: 13px; color: var(--label-2); }
+  .yt-fallback .btn { padding: 11px 18px; font-size: 15px; }
   .yt-form { display: flex; gap: 8px; margin: 0 0 12px; }
   .yt-form input { flex: 1; min-width: 0; background: var(--fill-2); border: 0; border-radius: 10px; padding: 9px 12px; color: var(--label); font: inherit; font-size: 15px; outline: 0; }
   .yt-form input::placeholder { color: var(--label-3); }
@@ -201,6 +207,8 @@
   }
   .tb-btn:hover { background: var(--fill-2); }
   .tb-btn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+  .tb-btn:disabled { opacity: .4; cursor: default; background: none; }
+  .switch:disabled { opacity: .45; cursor: default; }
   .tb-track { color: var(--label-2); font-weight: 400; max-width: 220px; }
   .tb-track[data-attached="true"]::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
   .tb-track span { overflow: hidden; text-overflow: ellipsis; }
@@ -226,6 +234,7 @@
   .small-btn { font-size: 15px; font-weight: 500; color: var(--accent); background: var(--fill-2); border: 0; border-radius: 8px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
   .small-btn:hover { background: var(--fill); }
   .small-btn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+  .small-btn:disabled { opacity: .4; cursor: default; }
 
   /* Sheets */
   .scrim { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.4); opacity: 0; transition: opacity var(--dur); }
@@ -392,6 +401,7 @@
       <div class="tb-group">
         <button class="tb-btn" id="tbPlay" aria-label="Play or pause (Ctrl+Space)"><span id="tbPlayIcon" data-icon="play"></span></button>
         <button class="tb-btn tb-track" id="tbTrack" title="Beat player"><span>No beat</span></button>
+        <button class="tb-btn" id="tbLoop" aria-pressed="false" aria-label="Loop on or off (Alt+L)" title="Loop on/off (Alt+L)"><span data-icon="repeat"></span></button>
       </div>
       <div class="tb-group">
         <button class="tb-btn" id="tbMetro" aria-pressed="false" aria-label="Metronome (Alt+M)"><span data-icon="metro"></span><span id="tbBpm">90</span></button>
@@ -466,7 +476,6 @@
     <div class="inset">
       <div class="row"><div class="lbl">Sort</div><div class="ctl"><div class="seg" data-setting="sort"><button data-value="modified">Recent</button><button data-value="name">Name</button></div></div></div>
       <div class="row"><div><div class="lbl">Folder</div><div class="desc" id="setFolderName"></div></div><div class="ctl"><button class="small-btn" id="setChangeFolder">Change…</button></div></div>
-      <div class="row"><div><div class="lbl">Play attached beat</div><div class="desc">When a lyric opens, start the beat attached to it</div></div><div class="ctl"><button class="switch" role="switch" data-setting="autoplayAttached" aria-label="Play attached beat when a lyric opens"></button></div></div>
     </div>
 
     <div class="sec-title">Shortcuts</div>
@@ -475,7 +484,8 @@
       <div class="row"><span class="lbl">Previous / next track</span><kbd>Ctrl ← &nbsp;·&nbsp; Ctrl →</kbd></div>
       <div class="row"><span class="lbl">Volume</span><kbd>Ctrl ↑ &nbsp;·&nbsp; Ctrl ↓</kbd></div>
       <div class="row"><span class="lbl">Loop start / end</span><kbd>Ctrl [ &nbsp;·&nbsp; Ctrl ]</kbd></div>
-      <div class="row"><span class="lbl">Clear loop</span><kbd>Alt L</kbd></div>
+      <div class="row"><span class="lbl">Loop on / off</span><kbd>Alt L</kbd></div>
+      <div class="row"><span class="lbl">Clear loop</span><kbd>Alt Shift L</kbd></div>
       <div class="row"><span class="lbl">Metronome</span><kbd>Alt M</kbd></div>
       <div class="row"><span class="lbl">Tap tempo</span><kbd>Alt T</kbd></div>
       <div class="row"><span class="lbl">New lyric</span><kbd>Alt N</kbd></div>
@@ -499,7 +509,14 @@
       <div class="row"><div><div class="lbl" id="plBindTitle">This lyric</div><div class="desc" id="plBindDesc">No beat attached</div></div><div class="ctl"><button class="small-btn" id="plAttach">Attach Current Beat</button></div></div>
     </div>
     <div class="now"><div class="now-title" id="plTitle">Nothing loaded</div><div class="now-sub" id="plSub">Add audio files, or capture what’s playing on your computer.</div></div>
-    <div class="yt-pane" id="ytPane" hidden><div id="ytBox"></div></div>
+    <div class="yt-pane" id="ytPane" hidden>
+      <div id="ytBox"></div>
+      <div class="yt-fallback" id="ytFallback" hidden>
+        <div class="yt-fb-title" id="ytFbTitle"></div>
+        <div class="yt-fb-msg" id="ytFbMsg"></div>
+        <button class="btn" id="ytWatch">Watch on YouTube</button>
+      </div>
+    </div>
     <p class="about" id="ytNote" hidden></p>
     <div class="pl-wave"><canvas id="plWave" aria-label="Track position"></canvas></div>
     <div class="times"><span id="plCur">0:00</span><span id="plDur">0:00</span></div>
@@ -510,6 +527,7 @@
     </div>
     <div class="inset">
       <div class="row"><div><div class="lbl">Loop section</div><div class="desc" id="plLoopDesc">Set A, then B</div></div><div class="ctl"><button class="small-btn" id="plA">A</button><button class="small-btn" id="plB">B</button><button class="small-btn" id="plClear">Clear</button></div></div>
+      <div class="row"><div><div class="lbl">Loop active</div><div class="desc">Off keeps the points but plays straight through</div></div><div class="ctl"><button class="switch" role="switch" id="plLoopOn" aria-checked="true" aria-label="Loop active"></button></div></div>
       <div class="row"><div class="lbl">Repeat track</div><div class="ctl"><button class="switch" role="switch" id="plLoopTrack" aria-checked="false" aria-label="Repeat track"></button></div></div>
       <div class="row"><div class="lbl">Volume</div><div class="ctl"><input type="range" min="0" max="100" value="100" id="plVol" aria-label="Volume"></div></div>
     </div>
@@ -603,6 +621,7 @@ const ICONS = {
   check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   doc: '<svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M9.5 12h5M9.5 15.5h5"/></svg>',
   sidebar: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M9.5 5v14M5.5 8.5h1.5M5.5 11.5h1.5"/></svg>',
+  repeat: '<svg viewBox="0 0 24 24"><path d="M17 3.5l3 3-3 3"/><path d="M20 6.5H8a4 4 0 0 0-4 4v1.5"/><path d="M7 20.5l-3-3 3-3"/><path d="M4 17.5h12a4 4 0 0 0 4-4V12"/></svg>',
 };
 const setIcon = (node, name) => { node.innerHTML = ICONS[name] || ''; node.dataset.icon = name; };
 $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
@@ -617,7 +636,7 @@ const DEFAULTS = {
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
   metroBpm: 90, metroSub: 1, metroAccent: true, metroVol: 60,
   sort: 'modified', sidebar: true, beatsPerLine: 4, volume: 100,
-  customTheme: null, lastPreset: 'system', autoplayAttached: true,
+  customTheme: null, lastPreset: 'system',
 };
 const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
@@ -1213,15 +1232,22 @@ const YT = {
     this.iframe = f;
     return f;
   },
-  load(id, autoplay) {
+  load(id, autoplay, start) {
     const f = this.ensureFrame();
-    this.videoId = id; this.ready = false; this.state = -1; this.cur = 0; this.dur = 0; this.wantPlay = !!autoplay;
+    this.videoId = id; this.ready = false; this.state = -1; this.cur = start > 0 ? start : 0; this.dur = 0; this.wantPlay = !!autoplay;
     const params = new URLSearchParams({ enablejsapi: '1', playsinline: '1', rel: '0', modestbranding: '1', widgetid: '1', autoplay: autoplay ? '1' : '0' });
+    if (start > 0) params.set('start', String(Math.floor(start)));
     if (/^https?:$/.test(location.protocol)) { params.set('origin', location.origin); params.set('widget_referrer', location.href); }
     f.src = `${YT_ORIGIN}/embed/${encodeURIComponent(id)}?${params.toString()}`;
     el.ytPane.hidden = false;
   },
-  hide() { if (this.playing) this.pause(); el.ytPane.hidden = true; },
+  // Tear the frame down completely; it is rebuilt on the next load(). Keeps the page light and the player predictable.
+  destroy() {
+    if (this.iframe) { try { this.iframe.src = 'about:blank'; } catch { /* ignore */ } this.iframe.remove(); this.iframe = null; }
+    this.videoId = null; this.ready = false; this.state = -1; this.cur = 0; this.dur = 0; this.wantPlay = false;
+    el.ytPane.hidden = true;
+  },
+  hide() { this.destroy(); },
   post(msg) { if (this.iframe && this.iframe.contentWindow) { try { this.iframe.contentWindow.postMessage(JSON.stringify(msg), '*'); } catch { /* ignore */ } } },
   cmd(func, args) { this.post({ event: 'command', func, args: args || [], id: 1, channel: 'widget' }); },
   play() { this.wantPlay = true; this.cmd('playVideo'); },
@@ -1234,7 +1260,6 @@ const YT = {
     if (!d || typeof d !== 'object') return;
     if (d.event === 'onReady') {
       this.ready = true; this.setVolume(settings.volume);
-      if (Player.pendingSeek != null) { this.seek(Player.pendingSeek); Player.pendingSeek = null; }
       if (this.wantPlay) this.play();
       Player.render(); return;
     }
@@ -1256,10 +1281,30 @@ const YT = {
     if (s === this.state) return;
     const was = this.playing; this.state = s;
     if (s === 0) { Player.onEnded(); return; }
-    if (this.playing !== was) { Player.render(); if (this.playing) Wave.tick(); }
+    if (this.playing !== was) { Player.render(); if (this.playing) Wave.tick(); else Loops.save(Player.current()); }
   },
 };
 addEventListener('message', e => YT.onMessage(e));
+
+/* Per-song memory: loop points, whether the loop is active, and the last position. */
+const Loops = {
+  key(it) { return it ? (it.kind === 'yt' ? `yt:${it.id}` : `file:${it.name}`) : null; },
+  all() { const v = LS.get('lyr:loops', {}); return v && typeof v === 'object' ? v : {}; },
+  get(it) { const k = this.key(it); return k ? (this.all()[k] || null) : null; },
+  save(it) {
+    const k = this.key(it); if (!k) return;
+    const all = this.all(), rec = Object.assign({}, all[k] || {});
+    if (Player.loopA != null) { rec.a = Player.loopA; rec.b = Player.loopB; rec.on = Player.loopOn; }
+    else { delete rec.a; delete rec.b; delete rec.on; }
+    const t = Player.time(), d = Player.duration();
+    rec.t = t > 3 && (!d || t < d - 3) ? Math.floor(t) : 0;
+    rec.u = Date.now();
+    all[k] = rec;
+    const keys = Object.keys(all);
+    if (keys.length > 200) keys.sort((x, y) => (all[x].u || 0) - (all[y].u || 0)).slice(0, keys.length - 200).forEach(x => { delete all[x]; });
+    LS.set('lyr:loops', all);
+  },
+};
 
 const Player = {
   items: [], idx: -1, url: null, loopA: null, loopB: null, loopTrack: false, loopTimer: null,
@@ -1314,23 +1359,24 @@ const Player = {
     this.idx = current ? kept.indexOf(current) : -1;
     this.render();
   },
-  pendingSeek: null,
-  // opts: { autoplay = true, seek, loopA, loopB } — used when a lyric's attached beat is restored.
+  pendingSeek: null, loopOn: true,
+  // opts: { autoplay = true, seek, loopA, loopB, loopOn } — explicit values win; otherwise the song's own memory is used.
   async play(i, opts = {}) {
     const it = this.items[i]; if (!it) return;
     const autoplay = opts.autoplay !== false;
     this.idx = i;
-    this.loopA = opts.loopA != null ? opts.loopA : null;
-    this.loopB = opts.loopB != null ? opts.loopB : null;
-    this.pendingSeek = opts.seek > 0 ? opts.seek : null;
+    const saved = Loops.get(it) || {};
+    this.loopA = opts.loopA != null ? opts.loopA : (saved.a != null ? saved.a : null);
+    this.loopB = opts.loopB != null ? opts.loopB : (saved.b != null ? saved.b : null);
+    this.loopOn = opts.loopOn != null ? !!opts.loopOn : (saved.on != null ? !!saved.on : true);
+    const seek = 'seek' in opts ? opts.seek : saved.t;
+    this.pendingSeek = seek > 0 ? seek : null;
     if (it.kind === 'yt') {
       el.audio.pause();
-      if (!/^https?:$/.test(location.protocol)) {
-        this.ytNote('YouTube can’t play while the app is opened as a file: its player needs a web address (error 153). Start the app with Lyrics.bat and try again.');
-        this.render(); return;
-      }
-      this.ytNote('');
-      YT.load(it.id, autoplay);
+      this.fallbackId = null; this.ytNote('');
+      if (!/^https?:$/.test(location.protocol)) { this.ytFallback(it, 'This video can only be watched on YouTube from here.'); return; }
+      YT.load(it.id, autoplay, this.pendingSeek || 0);
+      this.pendingSeek = null;
       this.render();
       return;
     }
@@ -1348,16 +1394,14 @@ const Player = {
   },
   ytNote(msg) { el.ytNote.hidden = !msg; el.ytNote.textContent = msg || ''; },
   ytError(code) {
-    const msgs = {
-      2: 'That YouTube link looks invalid.',
-      5: 'YouTube’s player hit a playback error. Try again.',
-      100: 'That video was not found or is private.',
-      101: 'The owner does not allow this video to be embedded.',
-      150: 'The owner does not allow this video to be embedded.',
-      153: 'YouTube refused to play because it received no page address (error 153). Start the app with Lyrics.bat so it runs from localhost.',
-    };
+    const it = this.current();
+    if (it && it.kind === 'yt' && (code === 153 || code === 101 || code === 150)) {
+      this.ytFallback(it, code === 153 ? 'This video can only be watched on YouTube from here.' : 'The owner allows this video only on YouTube.');
+      return;
+    }
+    const msgs = { 2: 'That YouTube link looks invalid.', 5: 'YouTube’s player hit a playback error. Try again.', 100: 'That video was not found or is private.' };
     const m = msgs[code] || `YouTube reported error ${code}.`;
-    this.ytNote(m); toast(m, 4500);
+    this.ytNote(m); toast(m, 4000);
   },
   // Find (or add) the playlist entry for an attached beat. Returns its index, or -1 if it cannot be loaded yet.
   async ensureItem(beat) {
@@ -1381,9 +1425,24 @@ const Player = {
   },
   toggle() {
     if (this.idx < 0) { if (this.items.length) this.play(0); else Sheet.open('player'); return; }
-    if (this.isYT()) { if (YT.playing) YT.pause(); else YT.play(); return; }
+    if (this.isYT()) {
+      const it = this.current();
+      if (this.fallbackId === it.id) { Sheet.open('player'); return; }
+      if (!YT.iframe || YT.videoId !== it.id) { this.play(this.idx); return; }   // frame was torn down: rebuild and play
+      if (YT.playing) YT.pause(); else YT.play();
+      return;
+    }
     Sound.ensure();
     if (el.audio.paused) el.audio.play().catch(() => {}); else el.audio.pause();
+  },
+  pauseAll() { el.audio.pause(); if (YT.playing) YT.pause(); },
+  fallbackId: null,
+  // Shown when a video cannot play embedded: title, reason, and a button to watch it on YouTube.
+  ytFallback(it, msg) {
+    this.fallbackId = it ? it.id : null;
+    el.ytFbTitle.textContent = it ? it.name : '';
+    el.ytFbMsg.textContent = msg || '';
+    this.render();
   },
   next() { if (this.items.length) this.play((this.idx + 1) % this.items.length); },
   prev() {
@@ -1395,6 +1454,7 @@ const Player = {
     if (this.idx < 0) return;
     this.loopA = this.time();
     if (this.loopB != null && this.loopB <= this.loopA + .2) this.loopB = null;
+    this.loopOn = true; Loops.save(this.current());
     this.render(); toast(`Loop start ${fmtTime(this.loopA)}`, 1400);
   },
   setB() {
@@ -1402,14 +1462,23 @@ const Player = {
     const t = this.time();
     if (this.loopA == null) this.loopA = 0;
     if (t <= this.loopA + .2) { toast('Move past the loop start first', 1600); return; }
-    this.loopB = t; this.render(); toast(`Loop ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}`, 1600);
+    this.loopB = t; this.loopOn = true; Loops.save(this.current());
+    this.render(); toast(`Loop ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}`, 1600);
   },
-  clearLoop(silent) { this.loopA = this.loopB = null; this.render(); if (!silent) toast('Loop cleared', 1200); },
-  tick() { if (this.loopA != null && this.loopB != null && !this.paused() && this.time() >= this.loopB) this.seek(this.loopA); },
+  clearLoop(silent) { this.loopA = this.loopB = null; this.loopOn = true; Loops.save(this.current()); this.render(); if (!silent) toast('Loop cleared', 1200); },
+  toggleLoop() {
+    if (this.loopA == null || this.loopB == null) { toast('Set loop points A and B first', 1600); return; }
+    this.loopOn = !this.loopOn; Loops.save(this.current()); this.render();
+    toast(this.loopOn ? 'Loop on' : 'Loop off · points kept', 1200);
+  },
+  tick() { if (this.loopOn && this.loopA != null && this.loopB != null && !this.paused() && this.time() >= this.loopB) this.seek(this.loopA); },
   render() {
     const it = this.items[this.idx];
     const playing = !!it && !this.paused();
-    el.ytPane.hidden = !(it && it.kind === 'yt');
+    const fb = !!(it && it.kind === 'yt' && this.fallbackId === it.id);
+    el.ytPane.hidden = !(it && it.kind === 'yt' && (fb || (YT.iframe && YT.videoId === it.id)));
+    el.ytFallback.hidden = !fb;
+    el.ytBox.hidden = fb;
     const rec = state.doc ? Bindings.cache.get(Bindings.key(state.doc.name)) : null;
     const attached = !!(rec && rec.beat && it && Bindings.matches(rec, it));
     el.tbTrack.dataset.attached = String(attached);
@@ -1429,15 +1498,21 @@ const Player = {
     el.plReopenBeats.hidden = !Beats.needsReopen;
     el.plFolderNote.hidden = !Beats.handle;
     if (Beats.handle) el.plFolderNote.textContent = `Music folder: “${Beats.handle.name}”. Choose “Music Folder…” to pick a different one.`;
-    el.plLoopDesc.textContent = this.loopA == null ? 'Set A, then B' : this.loopB == null ? `A ${fmtTime(this.loopA)} · now set B` : `${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}`;
+    const hasLoop = this.loopA != null && this.loopB != null;
+    el.plLoopDesc.textContent = this.loopA == null ? 'Set A, then B' : this.loopB == null ? `A ${fmtTime(this.loopA)} · now set B` : `${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}${this.loopOn ? '' : ' · off'}`;
     el.plA.setAttribute('aria-pressed', String(this.loopA != null));
     el.plB.setAttribute('aria-pressed', String(this.loopB != null));
+    el.plLoopOn.setAttribute('aria-checked', String(hasLoop && this.loopOn));
+    el.plLoopOn.disabled = !hasLoop;
+    el.tbLoop.setAttribute('aria-pressed', String(hasLoop && this.loopOn));
+    el.tbLoop.disabled = !hasLoop;
+    el.tbLoop.title = hasLoop ? `Loop ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)} · ${this.loopOn ? 'on' : 'off'} (Alt+L)` : 'No loop points yet (Ctrl+[ and Ctrl+])';
     el.plLoopTrack.setAttribute('aria-checked', String(this.loopTrack));
     el.plCapture.textContent = Sound.capturing ? 'Stop Capture' : 'Capture System Audio';
     el.plList.innerHTML = this.items.map((x, i) => `<li class="cell pl-cell${i === this.idx ? ' active' : ''}" data-i="${i}"><span class="ico">${x.kind === 'yt' ? ICONS.screen : ICONS.music}</span><div class="txt"><div class="ttl">${esc(x.name)}</div>${x.kind === 'yt' ? '<div class="sub">YouTube</div>' : ''}</div>${x.kind === 'yt' ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove">${ICONS.xmark}</button>` : ''}</li>`).join('');
     el.plEmpty.hidden = this.items.length > 0;
     this.renderTime();
-    const needTick = playing && this.loopB != null;
+    const needTick = playing && this.loopOn && this.loopB != null;
     if (needTick && !this.loopTimer) this.loopTimer = setInterval(() => this.tick(), 40);
     if (!needTick && this.loopTimer) { clearInterval(this.loopTimer); this.loopTimer = null; }
   },
@@ -1459,18 +1534,24 @@ el.audio.addEventListener('loadedmetadata', () => {
 });
 el.audio.addEventListener('seeked', () => Wave.draw());
 el.audio.addEventListener('play', () => { Player.render(); Visuals.wake(); Wave.tick(); });
-el.audio.addEventListener('pause', () => { Player.render(); Visuals.sleepSoon(); });
+el.audio.addEventListener('pause', () => { Player.render(); Visuals.sleepSoon(); Loops.save(Player.current()); });
 el.audio.addEventListener('error', () => { if (Player.idx >= 0) toast('This audio file could not be played'); });
 el.plVol.addEventListener('input', () => setVolume(Number(el.plVol.value), true));
 el.plPlay.addEventListener('click', () => Player.toggle());
 el.tbPlay.addEventListener('click', () => Player.toggle());
 el.tbTrack.addEventListener('click', () => { if (Beats.needsReopen && Player.idx < 0 && !Sound.capturing) Beats.reopen(false); else Sheet.open('player'); });
 el.plReopenBeats.addEventListener('click', () => Beats.reopen(false));
+el.ytWatch.addEventListener('click', () => {
+  const it = Player.current(); if (!it || it.kind !== 'yt') return;
+  window.open(`https://www.youtube.com/watch?v=${encodeURIComponent(it.id)}`, '_blank', 'noopener');
+});
 el.plPrev.addEventListener('click', () => Player.prev());
 el.plNext.addEventListener('click', () => Player.next());
 el.plA.addEventListener('click', () => Player.setA());
 el.plB.addEventListener('click', () => Player.setB());
 el.plClear.addEventListener('click', () => Player.clearLoop());
+el.plLoopOn.addEventListener('click', () => Player.toggleLoop());
+el.tbLoop.addEventListener('click', () => Player.toggleLoop());
 el.plLoopTrack.addEventListener('click', () => { Player.loopTrack = !Player.loopTrack; Player.render(); });
 el.plList.addEventListener('click', e => {
   const rm = e.target.closest('[data-remove]');
@@ -1936,7 +2017,7 @@ el.btnReopen.addEventListener('click', async () => {
     toast('Folder access restored');
   } catch (e) { console.warn(e); toast('Could not reopen the folder'); }
 });
-document.addEventListener('visibilitychange', () => { if (document.hidden) { saveDraftNow(); flushSave(); Bindings.saveState(state.doc); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { saveDraftNow(); flushSave(); Bindings.saveState(state.doc); Loops.save(Player.current()); } });
 addEventListener('pagehide', saveDraftNow);
 addEventListener('beforeunload', saveDraftNow);
 
@@ -2011,6 +2092,7 @@ async function openByName(name, opts) { const entry = state.files.find(f => f.na
 async function openFile(entry, opts = {}) {
   if (state.doc && state.doc.name === entry.name && !opts.force) { showDoc(); if (state.editing && innerWidth > 760) el.ta.focus(); return; }
   if (state.doc && !opts.force) Bindings.saveState(state.doc);
+  if (!opts.force) { Loops.save(Player.current()); Player.pauseAll(); YT.destroy(); Player.render(); }
   saveDraftNow(); await flushSave();
   let disk;
   try { disk = await FS.read(entry.handle); } catch (e) { handleFsError(e); return; }
@@ -2106,6 +2188,7 @@ async function renameCurrent() {
     const old = d.name;
     if (Drafts.get(old)) { Drafts.clear(old); if (d.dirty) Drafts.set(name, d.text); }
     await Snapshots.rename(old, name);
+    await Bindings.rename(old, name);
     d.name = name; d.handle = h; d.modified = (await h.getFile()).lastModified;
     state.snippets.delete(old);
     LS.set(lastKey(), name);
@@ -2120,6 +2203,7 @@ async function duplicateCurrent() {
     const name = await FS.uniqueName(FS.handle, `${stem(d.name)} copy.txt`);
     const h = await FS.copyVerified(d.handle, FS.handle, name);
     if (d.dirty) await FS.write(h, d.text, d);
+    await Bindings.copy(d.name, name);
     await refreshList(); broadcast({ type: 'list' });
     await openByName(name);
     toast(`Duplicated as “${stem(name)}”`);
@@ -2151,7 +2235,7 @@ async function trashActions(name) {
       await FS.move(trash, entry.handle, FS.handle, newName);
       await refreshList(); broadcast({ type: 'list' });
       toast(`Restored “${stem(newName)}”`); openByName(newName);
-    } else { await trash.removeEntry(name); await refreshList(); broadcast({ type: 'list' }); toast('Deleted forever'); }
+    } else { await trash.removeEntry(name); await Bindings.remove(name); await refreshList(); broadcast({ type: 'list' }); toast('Deleted forever'); }
   } catch (e) { handleFsError(e); }
 }
 async function emptyTrash() {
@@ -2160,7 +2244,7 @@ async function emptyTrash() {
   if (i !== 0) return;
   try {
     const trash = await FS.getTrash();
-    for (const f of state.trash) await trash.removeEntry(f.name);
+    for (const f of state.trash) { await trash.removeEntry(f.name); await Bindings.remove(f.name); }
     await refreshList(); broadcast({ type: 'list' });
     toast('Recently Deleted is empty');
   } catch (e) { handleFsError(e); }
@@ -2281,7 +2365,7 @@ const Bindings = {
     if (!d) { toast('Open a lyric first'); return; }
     if (!it) { toast('Play a beat first, then attach it'); return; }
     const beat = it.kind === 'yt' ? { kind: 'yt', id: it.id, name: it.name } : { kind: 'file', name: it.name, handle: it.handle || null };
-    await this.put(d.name, { beat, time: Player.time(), loopA: Player.loopA, loopB: Player.loopB, bpm: settings.metroBpm });
+    await this.put(d.name, { beat, time: Player.time(), loopA: Player.loopA, loopB: Player.loopB, loopOn: Player.loopOn, bpm: settings.metroBpm });
     Player.render();
     toast(`Attached “${it.name}” to “${stem(d.name)}”`, 2200);
   },
@@ -2296,7 +2380,7 @@ const Bindings = {
     if (!doc || !FS.folderId) return;
     const rec = this.cache.get(this.key(doc.name)); if (!rec || !rec.beat) return;
     const it = Player.current(); if (!it || !this.matches(rec, it)) return;
-    rec.time = Player.time(); rec.loopA = Player.loopA; rec.loopB = Player.loopB; rec.bpm = settings.metroBpm;
+    rec.time = Player.time(); rec.loopA = Player.loopA; rec.loopB = Player.loopB; rec.loopOn = Player.loopOn; rec.bpm = settings.metroBpm;
     await this.put(doc.name, rec);
   },
   // Called after a lyric opens: bring back its beat and where it was.
@@ -2305,12 +2389,18 @@ const Bindings = {
     Player.render();
     if (!rec || !rec.beat || state.doc !== doc) return;
     if (rec.bpm) { settings.metroBpm = clamp(rec.bpm, 40, 240); saveSettings(); Metro.render(); syncSettingsUI(); }
-    const wasPlaying = !Player.paused();
     const i = await Player.ensureItem(rec.beat);
     if (state.doc !== doc) return;
     if (i < 0) { toast(`Attached beat “${rec.beat.name}” is not loaded. Reopen the music folder or add the file.`, 3600); return; }
-    if (i === Player.idx && Player.current()) { Player.loopA = rec.loopA != null ? rec.loopA : null; Player.loopB = rec.loopB != null ? rec.loopB : null; Player.render(); return; }
-    await Player.play(i, { autoplay: settings.autoplayAttached || wasPlaying, seek: rec.time || 0, loopA: rec.loopA, loopB: rec.loopB });
+    const cur = Player.current();
+    const loaded = i === Player.idx && cur && (cur.kind !== 'yt' || (YT.iframe && YT.videoId === cur.id));
+    if (loaded) {
+      Player.loopA = rec.loopA != null ? rec.loopA : null; Player.loopB = rec.loopB != null ? rec.loopB : null;
+      Player.loopOn = rec.loopOn != null ? !!rec.loopOn : true;
+      Player.render(); return;
+    }
+    // Switching lyrics always leaves the player paused: cue the beat at its saved spot, ready for Play.
+    await Player.play(i, { autoplay: false, seek: rec.time || 0, loopA: rec.loopA, loopB: rec.loopB, loopOn: rec.loopOn });
   },
 };
 el.plAttach.addEventListener('click', () => {
@@ -2318,7 +2408,7 @@ el.plAttach.addEventListener('click', () => {
   const rec = Bindings.cache.get(Bindings.key(d.name));
   if (rec && rec.beat && Bindings.matches(rec, Player.current())) Bindings.detach(); else Bindings.attachCurrent();
 });
-setInterval(() => { if (state.doc && !Player.paused()) Bindings.saveState(state.doc); }, 20000);
+setInterval(() => { if (!Player.paused()) { Loops.save(Player.current()); if (state.doc) Bindings.saveState(state.doc); } }, 20000);
 
 function setVolume(v, fromSlider) {
   settings.volume = clamp(Math.round(v), 0, 100); saveSettings();
@@ -2356,7 +2446,9 @@ const Wave = {
         if (this.dragEdge) {
           this.dragEdge = null;
           if (this.creating && Player.loopB == null) Player.loopA = null;
+          else if (this.creating) Player.loopOn = true;
           this.creating = false;
+          Loops.save(Player.current());
           Player.render();
         }
         this.drag = false;
@@ -2450,9 +2542,10 @@ const Wave = {
       g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, w, h);
       const n = this.N, barW = w / n, gap = Math.min(2, Math.max(.6, barW * .38)), bw = Math.max(1, barW - gap);
       const base = h * .64, upMax = h * .56, downMax = h * .28;
+      const loopOn = Player.loopOn;
       if (hasDur && Player.loopA != null) {
         const a = Player.loopA / dur * w, b = (Player.loopB != null ? Player.loopB : dur) / dur * w;
-        g.fillStyle = `rgba(${acc},.16)`; g.fillRect(a, 0, Math.max(2, b - a), h);
+        g.fillStyle = loopOn ? `rgba(${acc},.16)` : `rgba(${lr},${lg},${lb},.07)`; g.fillRect(a, 0, Math.max(2, b - a), h);
       }
       for (let i = 0; i < n; i++) {
         const p = peaks ? peaks[i] : it ? .16 + .12 * Math.abs(Math.sin(i * 1.7) * Math.cos(i * .31)) : .07 + .04 * Math.sin(i * .37);
@@ -2468,9 +2561,9 @@ const Wave = {
         const tw = 14, th = 13;
         const handle = (t, label) => {
           const x = t / dur * w, tx = Math.min(Math.max(x - tw / 2, 0), w - tw);
-          g.fillStyle = `rgba(${acc},1)`; g.fillRect(x - 1, 0, 2, h);
+          g.fillStyle = loopOn ? `rgba(${acc},1)` : `rgba(${lr},${lg},${lb},.55)`; g.fillRect(x - 1, 0, 2, h);
           g.beginPath(); g.roundRect(tx, 2, tw, th, 4); g.fill();
-          g.fillStyle = this.colors.onAccent; g.font = `600 9px ${this.colors.font}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.fillStyle = loopOn ? this.colors.onAccent : `rgb(${lr},${lg},${lb})`; g.font = `600 9px ${this.colors.font}`; g.textAlign = 'center'; g.textBaseline = 'middle';
           g.fillText(label, tx + tw / 2, 2 + th / 2 + .5);
         };
         handle(Player.loopA, 'A');
@@ -2596,9 +2689,12 @@ el.btnEdit.addEventListener('click', () => { if (state.doc) setEditing(!state.ed
 el.docTitle.addEventListener('click', () => { if (state.doc) renameCurrent(); });
 el.btnMore.addEventListener('click', () => {
   if (!state.doc) return;
+  const rec = Bindings.cache.get(Bindings.key(state.doc.name));
+  const attached = !!(rec && rec.beat && Bindings.matches(rec, Player.current()));
   Menu.open(el.btnMore, [
     { label: 'Rename', icon: 'pencil', onClick: renameCurrent },
     { label: 'Duplicate', icon: 'copy', onClick: duplicateCurrent },
+    { label: attached ? 'Detach Beat' : (rec && rec.beat ? 'Attach Current Beat Instead' : 'Attach Current Beat'), icon: 'music', onClick: () => (attached ? Bindings.detach() : Bindings.attachCurrent()) },
     { label: 'History', icon: 'clock', onClick: () => Sheet.open('history') },
     { label: 'Delete', icon: 'trash', destructive: true, onClick: trashCurrent },
   ]);
@@ -2708,12 +2804,13 @@ addEventListener('keydown', e => {
     }
     return;
   }
-  if (e.altKey && !mod && !e.shiftKey) {
+  if (e.altKey && !mod) {
+    if (e.shiftKey) { if (e.code === 'KeyL') { e.preventDefault(); Player.clearLoop(); } return; }
     switch (e.code) {
       case 'KeyN': e.preventDefault(); createFile(); break;
       case 'KeyT': e.preventDefault(); Metro.tap(); break;
       case 'KeyM': e.preventDefault(); Metro.toggle(); break;
-      case 'KeyL': e.preventDefault(); Player.clearLoop(); break;
+      case 'KeyL': e.preventDefault(); Player.toggleLoop(); break;
       case 'KeyV': e.preventDefault(); setSetting('visuals', !settings.visuals); toast(settings.visuals ? 'Visuals on' : 'Visuals off', 1200); break;
       default: break;
     }
