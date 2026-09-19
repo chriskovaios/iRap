@@ -56,7 +56,16 @@
     transition: background-color var(--dur), opacity .6s;
   }
   .app.no-sidebar .sidebar { display: none; }
-  .side-head { display: flex; align-items: flex-end; justify-content: space-between; padding: 22px 16px 6px; }
+  .side-head { display: flex; align-items: flex-end; justify-content: space-between; padding: 22px 16px 6px; gap: 8px; }
+  .side-titles { min-width: 0; flex: 1; }
+  .side-titles .large-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .back-dir { display: inline-flex; font-size: 15px; padding: 2px 6px 2px 0; margin: 0 0 2px -4px; max-width: 100%; }
+  .back-dir[hidden] { display: none; }
+  .back-dir span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .cell.folder .ttl { font-weight: 500; }
+  .cell.folder .chev svg { width: 16px; height: 16px; color: var(--label-3); }
+  .cell.drop, .back-dir.drop { background: rgba(var(--accent-rgb), .22); }
+  .cell[draggable="true"] { -webkit-user-drag: element; }
   .large-title { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.1; }
   .search { margin: 8px 16px 12px; display: flex; align-items: center; gap: 6px; background: var(--fill-2); border-radius: 10px; padding: 7px 10px; color: var(--label-2); }
   .search input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--label); font: inherit; font-size: 17px; }
@@ -346,11 +355,14 @@
 <div id="app" class="app" data-view="list">
   <aside class="sidebar" id="sidebar">
     <div class="side-head">
-      <h1 class="large-title">Lyrics</h1>
-      <button class="icon-btn" id="btnNew" title="New lyric (Alt+N)" aria-label="New lyric"><span data-icon="plus"></span></button>
+      <div class="side-titles">
+        <button class="nav-btn back-dir" id="btnUp" hidden><span class="ico" data-icon="back"></span><span>Lyrics</span></button>
+        <h1 class="large-title" id="sideTitle">Lyrics</h1>
+      </div>
+      <button class="icon-btn" id="btnNew" title="New lyric or folder (Alt+N for a lyric)" aria-label="New lyric or folder"><span data-icon="plus"></span></button>
     </div>
     <label class="search"><span class="ico" data-icon="search"></span><input id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search lyrics"></label>
-    <div class="list-scroll">
+    <div class="list-scroll" id="listScroll">
       <section class="group">
         <ul class="inset" id="fileList"></ul>
         <p class="group-note" id="listEmpty" hidden>No lyrics yet. Tap + to start one.</p>
@@ -553,6 +565,17 @@
   <div class="sheet-body">
     <ul class="inset" id="histList"></ul>
     <p class="group-note" id="histEmpty" hidden>No earlier versions yet. A version is kept each time this lyric is saved.</p>
+  </div>
+</section>
+
+<section class="sheet" id="sheet_move" role="dialog" aria-label="Move to folder">
+  <div class="grabber"></div>
+  <div class="sheet-head"><h2 id="mvTitle">Move</h2><button class="nav-btn" data-close>Cancel</button></div>
+  <div class="sheet-body">
+    <div class="sec-title" id="mvPath">Lyrics</div>
+    <ul class="inset" id="mvList"></ul>
+    <p class="group-note" id="mvEmpty" hidden>No folders here. Move here, or go back up.</p>
+    <div class="btn-row"><button class="btn" id="mvHere">Move Here</button></div>
   </div>
 </section>
 
@@ -796,6 +819,8 @@ const DB = (() => {
     getBinding: k => run('bindings', 'readonly', s => s.get(k)),
     putBinding: rec => run('bindings', 'readwrite', s => s.put(rec)),
     delBinding: k => run('bindings', 'readwrite', s => s.delete(k)),
+    bindingsInRange: (lo, hi) => run('bindings', 'readonly', s => s.getAll(IDBKeyRange.bound(lo, hi))),
+    snapsInRange: (lo, hi) => run('snapshots', 'readonly', s => s.index('file').getAll(IDBKeyRange.bound(lo, hi))),
   };
 })();
 
@@ -857,6 +882,55 @@ const FS = {
     return this.listDir(dir);
   },
   getTrash() { return this.handle.getDirectoryHandle('Trash', { create: true }); },
+
+  // Folders below the granted root
+  async listSubdirs(dir, root) {
+    const out = [];
+    for await (const entry of dir.values()) {
+      if (entry.kind !== 'directory' || entry.name.startsWith('.') || (root && entry.name === 'Trash')) continue;
+      out.push({ name: entry.name, handle: entry, count: 0 });
+    }
+    return out;
+  },
+  async countTxt(dir) {
+    let n = 0;
+    try { for await (const e of dir.values()) if (e.kind === 'file' && /\.txt$/i.test(e.name) && !e.name.startsWith('.')) n++; } catch { /* ignore */ }
+    return n;
+  },
+  async walk(dir, path, out, depth = 0) {
+    if (depth > 8 || out.length > 3000) return;
+    for await (const entry of dir.values()) {
+      if (entry.name.startsWith('.')) continue;
+      if (entry.kind === 'directory') { if (depth === 0 && entry.name === 'Trash') continue; await this.walk(entry, path.concat(entry.name), out, depth + 1); }
+      else if (/\.txt$/i.test(entry.name)) {
+        let f; try { f = await entry.getFile(); } catch { continue; }
+        out.push({ name: entry.name, handle: entry, modified: f.lastModified, size: f.size, path, rel: path.concat(entry.name).join('/') });
+      }
+    }
+  },
+  async getDir(path, create) {
+    let dir = this.handle;
+    for (const seg of path) dir = await dir.getDirectoryHandle(seg, { create: !!create });
+    return dir;
+  },
+  async resolveFile(rel) {
+    const parts = rel.split('/'), name = parts.pop();
+    try { const dir = await this.getDir(parts, false); const handle = await dir.getFileHandle(name); return { dir, handle, name, path: parts }; }
+    catch { return null; }
+  },
+  async existsDir(dir, name) { try { await dir.getDirectoryHandle(name); return true; } catch { return false; } },
+  // Move a whole folder: copy every file (verified), recurse into subfolders, then remove the source.
+  async moveDir(srcParent, name, dstParent, newName) {
+    const src = await srcParent.getDirectoryHandle(name);
+    const dst = await dstParent.getDirectoryHandle(newName, { create: true });
+    const entries = [];
+    for await (const entry of src.values()) entries.push(entry);
+    for (const entry of entries) {
+      if (entry.kind === 'directory') await this.moveDir(src, entry.name, dst, entry.name);
+      else await this.move(src, entry, dst, entry.name);
+    }
+    await srcParent.removeEntry(name, { recursive: true });
+  },
 
   async read(handle) {
     const f = await handle.getFile();
@@ -1479,7 +1553,7 @@ const Player = {
     el.ytPane.hidden = !(it && it.kind === 'yt' && (fb || (YT.iframe && YT.videoId === it.id)));
     el.ytFallback.hidden = !fb;
     el.ytBox.hidden = fb;
-    const rec = state.doc ? Bindings.cache.get(Bindings.key(state.doc.name)) : null;
+    const rec = state.doc ? Bindings.cache.get(Bindings.key(state.doc.rel)) : null;
     const attached = !!(rec && rec.beat && it && Bindings.matches(rec, it));
     el.tbTrack.dataset.attached = String(attached);
     el.plBindBox.hidden = !state.doc;
@@ -1846,7 +1920,7 @@ function analyze(lines) {
 /* ============================================================
    Application state
    ============================================================ */
-const state = { files: [], trash: [], doc: null, editing: true, filter: '', paused: false, trashOpen: false, snippets: new Map(), queues: new Map() };
+const state = { files: [], folders: [], trash: [], path: [], dir: null, tree: null, dragRel: null, doc: null, editing: true, filter: '', paused: false, trashOpen: false, snippets: new Map(), queues: new Map() };
 const stem = n => n.replace(/\.txt$/i, '');
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('lyrics-studio') : null;
 const broadcast = msg => { if (channel && FS.folderId) channel.postMessage(Object.assign({ folderId: FS.folderId, tab: TAB_ID }, msg)); };
@@ -2460,7 +2534,7 @@ const REASONS = { save: 'Saved version', external: 'Changed outside the app', di
 async function renderHistory() {
   const d = state.doc; el.histList.innerHTML = '';
   if (!d) { el.histEmpty.hidden = false; return; }
-  const list = await Snapshots.list(d.name);
+  const list = await Snapshots.list(d.rel);
   el.histEmpty.hidden = list.length > 0;
   el.histList.innerHTML = list.map(s => {
     const first = s.text.split('\n').map(x => x.trim()).find(Boolean) || '';
@@ -2472,7 +2546,7 @@ el.histList.addEventListener('click', async e => {
   const d = state.doc; if (!d) return;
   const snap = await safe(() => DB.getSnap(+b.dataset.restore));
   if (!snap || typeof snap.text !== 'string') { toast('That version is no longer available'); return; }
-  await Snapshots.add(d.name, d.text, 'restore');
+  await Snapshots.add(d.rel, d.text, 'restore');
   d.text = snap.text; d.dirty = d.text !== d.savedText; el.ta.value = d.text;
   renderMirror(); renderReader(); saveDraftNow(); scheduleSave(true);
   Sheet.close(); toast('Version restored');
@@ -2482,7 +2556,7 @@ if (channel) channel.addEventListener('message', async ({ data }) => {
   if (!data || data.tab === TAB_ID || !FS.handle || data.folderId !== FS.folderId) return;
   if (data.type === 'saved') {
     const d = state.doc;
-    if (d && d.name === data.name && !d.dirty && d.modified !== data.modified) await openFile({ name: d.name, handle: d.handle }, { force: true });
+    if (d && d.rel === data.rel && !d.dirty && d.modified !== data.modified) await openFile(d, { force: true });
   }
   await refreshList();
 });
@@ -2571,27 +2645,27 @@ const Bindings = {
     if (!d) { toast('Open a lyric first'); return; }
     if (!it) { toast('Play a beat first, then attach it'); return; }
     const beat = it.kind === 'yt' ? { kind: 'yt', id: it.id, name: it.name } : { kind: 'file', name: it.name, handle: it.handle || null };
-    await this.put(d.name, { beat, time: Player.time(), loopA: Player.loopA, loopB: Player.loopB, loopOn: Player.loopOn, bpm: settings.metroBpm });
+    await this.put(d.rel, { beat, time: Player.time(), loopA: Player.loopA, loopB: Player.loopB, loopOn: Player.loopOn, bpm: settings.metroBpm });
     Player.render();
     toast(`Attached “${it.name}” to “${stem(d.name)}”`, 2200);
   },
   async detach() {
     const d = state.doc; if (!d) return;
-    await this.remove(d.name);
+    await this.remove(d.rel);
     Player.render();
     toast('Beat detached', 1400);
   },
   // Called before switching lyrics and when the tab hides: keep the current position, loop and tempo.
   async saveState(doc) {
     if (!doc || !FS.folderId) return;
-    const rec = this.cache.get(this.key(doc.name)); if (!rec || !rec.beat) return;
+    const rec = this.cache.get(this.key(doc.rel)); if (!rec || !rec.beat) return;
     const it = Player.current(); if (!it || !this.matches(rec, it)) return;
     rec.time = Player.time(); rec.loopA = Player.loopA; rec.loopB = Player.loopB; rec.loopOn = Player.loopOn; rec.bpm = settings.metroBpm;
-    await this.put(doc.name, rec);
+    await this.put(doc.rel, rec);
   },
   // Called after a lyric opens: bring back its beat and where it was.
   async restore(doc) {
-    const rec = await this.get(doc.name);
+    const rec = await this.get(doc.rel);
     Player.render();
     if (!rec || !rec.beat || state.doc !== doc) return;
     if (rec.bpm) { settings.metroBpm = clamp(rec.bpm, 40, 240); saveSettings(); Metro.render(); syncSettingsUI(); }
@@ -2611,7 +2685,7 @@ const Bindings = {
 };
 el.plAttach.addEventListener('click', () => {
   const d = state.doc; if (!d) return;
-  const rec = Bindings.cache.get(Bindings.key(d.name));
+  const rec = Bindings.cache.get(Bindings.key(d.rel));
   if (rec && rec.beat && Bindings.matches(rec, Player.current())) Bindings.detach(); else Bindings.attachCurrent();
 });
 setInterval(() => { if (!Player.paused()) { Loops.save(Player.current()); if (state.doc) Bindings.saveState(state.doc); } }, 20000);
@@ -2872,10 +2946,50 @@ el.setChangeFolder.addEventListener('click', async () => { Sheet.close(); saveDr
 /* ============================================================
    Sidebar, navigation and toolbar wiring
    ============================================================ */
-el.fileList.addEventListener('click', e => { const c = e.target.closest('.cell'); if (c) openByName(c.dataset.name); });
+function activateCell(c) {
+  if (!c) return;
+  if (c.dataset.dir != null) navigate(state.path.concat(c.dataset.dir));
+  else if (c.dataset.rel) openRel(c.dataset.rel);
+}
+el.fileList.addEventListener('click', e => activateCell(e.target.closest('.cell')));
 el.fileList.addEventListener('keydown', e => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
-  const c = e.target.closest('.cell'); if (c) { e.preventDefault(); openByName(c.dataset.name); }
+  const c = e.target.closest('.cell'); if (c) { e.preventDefault(); activateCell(c); }
+});
+el.fileList.addEventListener('contextmenu', e => {
+  const c = e.target.closest('.cell.folder'); if (!c) return;
+  e.preventDefault();
+  const name = c.dataset.dir;
+  Menu.open(c, [
+    { label: 'Open', icon: 'folder', onClick: () => navigate(state.path.concat(name)) },
+    { label: 'Rename Folder', icon: 'pencil', onClick: () => renameFolder(name) },
+    { label: 'Delete Folder', icon: 'trash', destructive: true, onClick: () => deleteFolder(name) },
+  ]);
+});
+el.btnUp.addEventListener('click', () => navigate(state.path.slice(0, -1)));
+// Drag a lyric onto a folder (or onto the back button) to move it there.
+el.fileList.addEventListener('dragstart', e => {
+  const c = e.target.closest('.cell[data-rel]'); if (!c) return;
+  state.dragRel = c.dataset.rel;
+  try { e.dataTransfer.setData('text/plain', c.dataset.rel); e.dataTransfer.effectAllowed = 'move'; } catch { /* ignore */ }
+});
+el.fileList.addEventListener('dragend', () => { state.dragRel = null; $$('.drop', el.sidebar).forEach(x => x.classList.remove('drop')); });
+const dropTarget = e => e.target.closest('.cell.folder, #btnUp');
+el.sidebar.addEventListener('dragover', e => {
+  if (!state.dragRel) return;
+  const t = dropTarget(e); if (!t) return;
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+  $$('.drop', el.sidebar).forEach(x => { if (x !== t) x.classList.remove('drop'); });
+  t.classList.add('drop');
+});
+el.sidebar.addEventListener('dragleave', e => { const t = dropTarget(e); if (t && !t.contains(e.relatedTarget)) t.classList.remove('drop'); });
+el.sidebar.addEventListener('drop', e => {
+  if (!state.dragRel) return;
+  const t = dropTarget(e); if (!t) return;
+  e.preventDefault(); e.stopPropagation();
+  t.classList.remove('drop');
+  const rel = state.dragRel; state.dragRel = null;
+  moveFile(rel, t.id === 'btnUp' ? state.path.slice(0, -1) : state.path.concat(t.dataset.dir));
 });
 el.trashList.addEventListener('click', e => { const c = e.target.closest('.cell'); if (c) trashActions(c.dataset.trash); });
 el.trashList.addEventListener('keydown', e => {
@@ -2884,21 +2998,29 @@ el.trashList.addEventListener('keydown', e => {
 });
 el.trashToggle.addEventListener('click', () => { state.trashOpen = !state.trashOpen; renderList(); });
 el.btnEmptyTrash.addEventListener('click', emptyTrash);
-el.search.addEventListener('input', () => { state.filter = el.search.value; renderList(); });
+el.search.addEventListener('input', () => {
+  state.filter = el.search.value;
+  renderList();
+  if (state.filter.trim()) ensureTree();   // search spans every folder in the tree
+});
 el.search.addEventListener('keydown', e => {
-  if (e.key === 'Enter') { const first = $('.cell', el.fileList); if (first) openByName(first.dataset.name); }
+  if (e.key === 'Enter') activateCell($('.cell', el.fileList));
   else if (e.key === 'Escape') { el.search.value = ''; state.filter = ''; renderList(); el.search.blur(); }
 });
-el.btnNew.addEventListener('click', createFile);
+el.btnNew.addEventListener('click', () => Menu.open(el.btnNew, [
+  { label: 'New Lyric', icon: 'doc', onClick: createFile },
+  { label: 'New Folder', icon: 'folder', onClick: createFolder },
+]));
 el.btnBack.addEventListener('click', () => { saveDraftNow(); flushSave(); showList(); });
 el.btnEdit.addEventListener('click', () => { if (state.doc) setEditing(!state.editing); });
 el.docTitle.addEventListener('click', () => { if (state.doc) renameCurrent(); });
 el.btnMore.addEventListener('click', () => {
   if (!state.doc) return;
-  const rec = Bindings.cache.get(Bindings.key(state.doc.name));
+  const rec = Bindings.cache.get(Bindings.key(state.doc.rel));
   const attached = !!(rec && rec.beat && Bindings.matches(rec, Player.current()));
   Menu.open(el.btnMore, [
     { label: 'Rename', icon: 'pencil', onClick: renameCurrent },
+    { label: 'Move to Folder…', icon: 'folder', onClick: () => MoveUI.open(state.doc.rel) },
     { label: 'Duplicate', icon: 'copy', onClick: duplicateCurrent },
     { label: attached ? 'Detach Beat' : (rec && rec.beat ? 'Attach Current Beat Instead' : 'Attach Current Beat'), icon: 'music', onClick: () => (attached ? Bindings.detach() : Bindings.attachCurrent()) },
     { label: 'History', icon: 'clock', onClick: () => Sheet.open('history') },
