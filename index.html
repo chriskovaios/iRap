@@ -21,8 +21,8 @@
     --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
     --ease: cubic-bezier(.32,.72,0,1);
     --dur: .32s;
-    --sidebar-w: 320px; --toolbar-h: 49px; --nav-h: 52px;
-    --editor-size: 17px; --editor-lh: 1.55; --gutter-w: 48px; --wave-h: 44px;
+    --sidebar-w: clamp(250px, 28vw, 320px); --toolbar-h: 49px; --nav-h: 52px;
+    --editor-size: 18px; --editor-lh: 1.55; --editor-line: 28px; --gutter-w: 48px; --wave-h: 44px;
     --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
     color-scheme: dark;
   }
@@ -32,7 +32,7 @@
   html, body { height: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--label); font-family: var(--font); font-size: 17px;
-    -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none;
+    -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-text-size-adjust: 100%;
     transition: background-color var(--dur), color var(--dur);
   }
   button { font-family: inherit; color: inherit; }
@@ -148,23 +148,24 @@
   .editor-wrap { position: relative; }
   .editor-wrap[hidden] { display: none; }
   .mirror, .ta {
-    font: var(--editor-size) / var(--editor-lh) var(--font); letter-spacing: -.005em; word-spacing: 0;
+    font: var(--editor-size) / var(--editor-line) var(--font); letter-spacing: -.005em; word-spacing: 0;
     white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 4;
     padding: 0 0 0 var(--gutter-w); margin: 0; border: 0; width: 100%; text-align: left;
   }
-  .mirror { color: transparent; min-height: calc(var(--editor-size) * var(--editor-lh) * 6); pointer-events: none; }
-  .mirror .ln { min-height: calc(var(--editor-size) * var(--editor-lh)); }
+  .mirror { color: transparent; min-height: calc(var(--editor-line) * 6); pointer-events: none; }
+  .mirror .ln { min-height: var(--editor-line); }
   .mirror .rh { background: var(--tint); box-shadow: 0 0 0 3px var(--tint); border-radius: 5px; }
   .ta {
     position: absolute; inset: 0; height: 100%; resize: none; outline: 0 !important; background: transparent; color: var(--label);
     caret-color: var(--accent); overflow: hidden; display: block; -webkit-text-fill-color: var(--label);
+    -webkit-appearance: none; appearance: none; border-radius: 0; -webkit-text-size-adjust: 100%;
   }
   .ta::placeholder { color: var(--label-3); -webkit-text-fill-color: var(--label-3); }
   .ta::selection { background: rgba(var(--accent-rgb), .35); }
   .gutter { position: absolute; left: 0; top: 0; width: var(--gutter-w); pointer-events: none; }
   .gutter span {
     position: absolute; left: 0; width: calc(var(--gutter-w) - 16px); text-align: right; font-size: 12px; color: var(--label-3);
-    font-variant-numeric: tabular-nums; line-height: calc(var(--editor-size) * var(--editor-lh));
+    font-variant-numeric: tabular-nums; line-height: var(--editor-line);
   }
   .reader { font-size: calc(var(--editor-size) + 2px); line-height: 1.75; text-align: center; letter-spacing: -.005em; }
   .reader[hidden] { display: none; }
@@ -175,7 +176,12 @@
   .counts { position: absolute; right: 16px; bottom: calc(var(--toolbar-h) + var(--wave-h) + 8px + var(--safe-b)); font-size: 12px; color: var(--label-3); font-variant-numeric: tabular-nums; pointer-events: none; text-align: right; }
 
   /* Always-visible waveform bar */
-  .wavebar { height: var(--wave-h); flex: none; position: relative; background: rgba(var(--bg-rgb), .45); border-top: 1px solid var(--separator); }
+  .wavebar { height: var(--wave-h); flex: none; position: relative; display: flex; align-items: stretch; background: rgba(var(--bg-rgb), .45); border-top: 1px solid var(--separator); }
+  .wave-main { position: relative; flex: 1; min-width: 0; }
+  .wave-vol { display: flex; align-items: center; gap: 4px; padding: 0 10px 0 6px; border-left: 1px solid var(--separator); flex: none; }
+  .vol-btn { width: 30px; height: 30px; border: 0; background: none; color: var(--label-2); display: grid; place-items: center; cursor: pointer; border-radius: 8px; padding: 0; }
+  .vol-btn svg { width: 18px; height: 18px; }
+  .wave-vol input[type="range"] { width: 96px; }
   .wavebar canvas, .pl-wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; touch-action: none; }
   .wave-time { position: absolute; bottom: 3px; font-size: 10px; color: var(--label-3); font-variant-numeric: tabular-nums; pointer-events: none; }
   .wave-time.l { left: 8px; } .wave-time.r { right: 8px; }
@@ -228,7 +234,7 @@
   .tb-btn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
   .tb-btn:disabled { opacity: .4; cursor: default; background: none; }
   .switch:disabled { opacity: .45; cursor: default; }
-  .tb-track { color: var(--label-2); font-weight: 400; max-width: 220px; }
+  .tb-track { color: var(--label-2); font-weight: 400; max-width: clamp(90px, 18vw, 220px); }
   .tb-track[data-attached="true"]::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
   .tb-track span { overflow: hidden; text-overflow: ellipsis; }
 
@@ -261,7 +267,7 @@
   .scrim[hidden] { display: none; }
   #scrimModal { z-index: 24; }
   .sheet {
-    position: fixed; left: 50%; bottom: 0; transform: translate(-50%, 105%); width: min(560px, 100%); max-height: 88vh; z-index: 21;
+    position: fixed; left: 50%; bottom: 0; transform: translate(-50%, 105%); width: min(560px, 100%); max-height: 88vh; max-height: 88dvh; z-index: 21;
     background: var(--bg-2); border-radius: 14px 14px 0 0; display: flex; flex-direction: column; visibility: hidden;
     box-shadow: 0 -10px 40px rgba(0,0,0,.35);
     transition: transform var(--dur) var(--ease), visibility 0s linear var(--dur), background-color var(--dur);
@@ -358,6 +364,30 @@
     #tbTap { display: none; }
     .tb-btn { min-width: 34px; padding: 0 6px; }
     .doc-inner { padding: 20px 16px 45vh; }
+    .wave-vol input[type="range"] { width: 64px; }
+    .wave-vol { padding: 0 8px 0 4px; }
+    .scroll-pill { max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+  }
+  @media (max-width: 480px) {
+    .large-title { font-size: 30px; }
+    .counts { display: none; }
+    .row { flex-wrap: wrap; }
+    .row .ctl { margin-left: auto; }
+    .seg button { padding: 6px 8px; font-size: 12px; }
+    .doc-inner { padding: 16px 12px 45vh; }
+    .swatches { gap: 12px; }
+    .btn-row .btn { flex: 1 1 100%; }
+    .transport { gap: 18px; }
+  }
+  @media (hover: none) {
+    .cell:not(.active):hover { background: transparent; }
+    .tb-btn:not([aria-pressed="true"]):hover, .nav-btn:hover, .doc-title:hover { background: none; }
+    .icon-btn:hover { background: var(--fill-2); }
+  }
+  @media (max-height: 480px) {
+    .side-head { padding-top: 10px; }
+    .large-title { font-size: 26px; }
+    .doc-inner { padding-bottom: 30vh; }
   }
 </style>
 </head>
@@ -420,8 +450,14 @@
     <div class="counts" id="counts"></div>
     <button class="scroll-pill" id="scrollPill" title="Auto-scroll (Space)"><span id="scrollPillIcon" data-icon="play"></span><span id="scrollPillText">Auto-scroll</span></button>
     <div class="wavebar" id="wavebar">
-      <canvas id="wave" aria-label="Track position"></canvas>
-      <span class="wave-time l" id="waveCur">0:00</span><span class="wave-time r" id="waveDur">0:00</span>
+      <div class="wave-main">
+        <canvas id="wave" aria-label="Track position"></canvas>
+        <span class="wave-time l" id="waveCur">0:00</span><span class="wave-time r" id="waveDur">0:00</span>
+      </div>
+      <div class="wave-vol">
+        <button class="vol-btn" id="btnMute" aria-label="Mute or unmute" title="Mute (scroll to adjust volume)"><span id="volIcon" data-icon="speaker"></span></button>
+        <input type="range" id="waveVol" min="0" max="100" value="100" aria-label="Volume">
+      </div>
     </div>
     <footer class="toolbar">
       <div class="tb-group">
@@ -507,8 +543,8 @@
     <div class="sec-title">Shortcuts</div>
     <div class="inset shortcuts">
       <div class="row"><span class="lbl">Play / pause</span><kbd>Ctrl Space</kbd></div>
-      <div class="row"><span class="lbl">Previous / next track</span><kbd>Ctrl ← &nbsp;·&nbsp; Ctrl →</kbd></div>
-      <div class="row"><span class="lbl">Volume</span><kbd>Ctrl ↑ &nbsp;·&nbsp; Ctrl ↓</kbd></div>
+      <div class="row"><span class="lbl">Previous / next track</span><kbd>Alt ← &nbsp;·&nbsp; Alt →</kbd></div>
+      <div class="row"><span class="lbl">Volume</span><kbd>Alt ↑ &nbsp;·&nbsp; Alt ↓</kbd></div>
       <div class="row"><span class="lbl">Loop start / end</span><kbd>Ctrl [ &nbsp;·&nbsp; Ctrl ]</kbd></div>
       <div class="row"><span class="lbl">Loop on / off</span><kbd>Alt L</kbd></div>
       <div class="row"><span class="lbl">Clear loop</span><kbd>Alt Shift L</kbd></div>
@@ -659,6 +695,8 @@ const ICONS = {
   doc: '<svg viewBox="0 0 24 24"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M9.5 12h5M9.5 15.5h5"/></svg>',
   sidebar: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M9.5 5v14M5.5 8.5h1.5M5.5 11.5h1.5"/></svg>',
   repeat: '<svg viewBox="0 0 24 24"><path d="M17 3.5l3 3-3 3"/><path d="M20 6.5H8a4 4 0 0 0-4 4v1.5"/><path d="M7 20.5l-3-3 3-3"/><path d="M4 17.5h12a4 4 0 0 0 4-4V12"/></svg>',
+  speaker: '<svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4 3.5v-12l-4 3.5z"/><path d="M15 9.5a3.5 3.5 0 0 1 0 5"/><path d="M17.5 7a7 7 0 0 1 0 10"/></svg>',
+  speakerOff: '<svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4 3.5v-12l-4 3.5z"/><path d="M15.5 9.5l4 5M19.5 9.5l-4 5"/></svg>',
 };
 const setIcon = (node, name) => { node.innerHTML = ICONS[name] || ''; node.dataset.icon = name; };
 $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
@@ -2089,7 +2127,7 @@ function renderMirror() {
   let html = '';
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line) { html += '<div class="ln">​</div>'; continue; }
+    if (!line) { html += '<div class="ln"><br></div>'; continue; }
     const m = an.marks[i];
     if (!m) { html += `<div class="ln">${esc(line)}</div>`; continue; }
     let out = '', pos = 0;
@@ -2832,12 +2870,22 @@ el.plAttach.addEventListener('click', () => {
 });
 setInterval(() => { if (!Player.paused()) { Loops.save(Player.current()); if (state.doc) Bindings.saveState(state.doc); } }, 20000);
 
+let volumeBeforeMute = 100;
 function setVolume(v, fromSlider) {
   settings.volume = clamp(Math.round(v), 0, 100); saveSettings();
   el.audio.volume = settings.volume / 100;
   YT.setVolume(settings.volume);
-  if (!fromSlider) { el.plVol.value = String(settings.volume); toast(`Volume ${settings.volume}%`, 900); }
+  el.plVol.value = String(settings.volume);
+  el.waveVol.value = String(settings.volume);
+  setIcon(el.volIcon, settings.volume === 0 ? 'speakerOff' : 'speaker');
+  el.btnMute.title = settings.volume === 0 ? 'Unmute' : `Volume ${settings.volume}% · click to mute, scroll to adjust`;
+  if (!fromSlider) toast(settings.volume === 0 ? 'Muted' : `Volume ${settings.volume}%`, 900);
 }
+el.waveVol.addEventListener('input', () => setVolume(Number(el.waveVol.value), true));
+el.btnMute.addEventListener('click', () => {
+  if (settings.volume > 0) { volumeBeforeMute = settings.volume; setVolume(0); }
+  else setVolume(volumeBeforeMute || 60);
+});
 
 /* ============================================================
    Waveform (SoundCloud-style) with click and drag seeking
@@ -3052,7 +3100,7 @@ function onSettingChange(key) {
   switch (key) {
     case 'theme': applyTheme(); break;
     case 'grain': el.grain.hidden = !settings.grain; break;
-    case 'fontSize': root.setProperty('--editor-size', `${settings.fontSize}px`); queueRender(); break;
+    case 'fontSize': applyEditorSize(); queueRender(); break;
     case 'visuals': Visuals.applyEnabled(); if (settings.visuals && (Sound.active || Metro.on)) Visuals.wake(); break;
     case 'intensity': if (!Visuals.running) Visuals.drawStatic(); break;
     case 'syllables': root.setProperty('--gutter-w', settings.syllables ? '48px' : '0px'); queueRender(); break;
@@ -3250,6 +3298,8 @@ function bindWheelControls(root) {
 }
 bindWheelControls(el.sheet_settings);
 bindWheelControls(el.sheet_player);
+bindWheelControls(el.wavebar);
+el.btnMute.addEventListener('wheel', e => { e.preventDefault(); const s = wheelSteps(e, el.btnMute); if (s) setVolume(settings.volume + s * 5); }, { passive: false });
 $$('.stepper[data-setting], input[type="range"]').forEach(n => { n.title = 'Scroll to adjust'; });
 
 const bpmWheel = node => node.addEventListener('wheel', e => {
@@ -3282,10 +3332,6 @@ addEventListener('keydown', e => {
   if (mod && !e.altKey && !e.shiftKey) {
     switch (e.code) {
       case 'Space': e.preventDefault(); Player.toggle(); break;
-      case 'ArrowRight': e.preventDefault(); Player.next(); break;
-      case 'ArrowLeft': e.preventDefault(); Player.prev(); break;
-      case 'ArrowUp': e.preventDefault(); setVolume(settings.volume + 5); break;
-      case 'ArrowDown': e.preventDefault(); setVolume(settings.volume - 5); break;
       case 'BracketLeft': e.preventDefault(); Player.setA(); break;
       case 'BracketRight': e.preventDefault(); Player.setB(); break;
       case 'KeyK': e.preventDefault(); showList(); el.search.focus(); el.search.select(); break;
@@ -3300,6 +3346,10 @@ addEventListener('keydown', e => {
   if (e.altKey && !mod) {
     if (e.shiftKey) { if (e.code === 'KeyL') { e.preventDefault(); Player.clearLoop(); } return; }
     switch (e.code) {
+      case 'ArrowRight': e.preventDefault(); Player.next(); break;
+      case 'ArrowLeft': e.preventDefault(); Player.prev(); break;
+      case 'ArrowUp': e.preventDefault(); setVolume(settings.volume + 5); break;
+      case 'ArrowDown': e.preventDefault(); setVolume(settings.volume - 5); break;
       case 'KeyN': e.preventDefault(); createFile(); break;
       case 'KeyT': e.preventDefault(); Metro.tap(); break;
       case 'KeyM': e.preventDefault(); Metro.toggle(); break;
@@ -3329,14 +3379,22 @@ addEventListener('drop', e => {
 /* ============================================================
    Boot
    ============================================================ */
+// Whole-pixel line height: WebKit snaps each textarea line to integer pixels, and the highlight layer must match exactly.
+function applyEditorSize() {
+  const root = document.documentElement.style, size = clamp(Number(settings.fontSize) || 18, 12, 40);
+  root.setProperty('--editor-size', `${size}px`);
+  root.setProperty('--editor-line', `${Math.round(size * 1.55)}px`);
+}
 function applyInitialSettings() {
   const root = document.documentElement.style;
-  root.setProperty('--editor-size', `${settings.fontSize}px`);
+  applyEditorSize();
   root.setProperty('--gutter-w', settings.syllables ? '48px' : '0px');
   el.grain.hidden = !settings.grain;
   applySidebar();
   el.audio.volume = clamp(settings.volume, 0, 100) / 100;
   el.plVol.value = String(settings.volume);
+  el.waveVol.value = String(settings.volume);
+  setIcon(el.volIcon, settings.volume === 0 ? 'speakerOff' : 'speaker');
   Metro.render();
 }
 async function boot() {
