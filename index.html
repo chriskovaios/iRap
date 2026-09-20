@@ -169,7 +169,11 @@
   }
   .reader { font-size: calc(var(--editor-size) + 2px); line-height: 1.75; text-align: center; letter-spacing: -.005em; }
   .reader[hidden] { display: none; }
-  .reader p { margin: 0 0 1.6em; white-space: pre-wrap; }
+  .reader p { margin: 0 0 1.6em; }
+  .reader .rl { position: relative; white-space: pre-wrap; }
+  .reader.with-syl .rl { padding: 0 34px; }
+  .reader .rh { background: var(--tint); box-shadow: 0 0 0 3px var(--tint); border-radius: 5px; }
+  .reader .syl { position: absolute; left: 0; top: 0; font-size: 12px; color: var(--label-3); font-variant-numeric: tabular-nums; line-height: inherit; }
   .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--label-3); text-align: center; padding: 24px; pointer-events: none; }
   .empty[hidden] { display: none; }
   .empty p { margin: 12px 0 0; font-size: 15px; }
@@ -797,6 +801,7 @@ function applyTheme() {
     if (sw) { sw.style.setProperty('--sw-bg', t.bg); sw.style.setProperty('--sw-ac', t.accent); }
   }
   themeListeners.forEach(fn => fn({ palette: [a, b, mid], dark }));
+  if (state.doc && !state.editing) renderReader();   // rhyme tints follow the theme in reading view too
 }
 function buildSwatches() {
   const entries = Object.entries(THEMES).map(([key, t]) => [key, t.name, t.dark ? (lightMedia.matches ? t.light : t.dark) : t]);
@@ -2151,10 +2156,29 @@ function renderMirror() {
   if (settings.syllables) counts += ` · ${plural(an.total, 'syllable')}`;
   el.counts.textContent = counts;
 }
+// Reading view gets the same helpers as the editor: rhyme tints inline, syllable counts in the margin.
 function renderReader() {
   const d = state.doc;
   if (!d) { el.reader.innerHTML = ''; return; }
-  el.reader.innerHTML = d.text.split(/\n[ \t]*\n+/).map(s => `<p>${esc(s)}</p>`).join('');
+  const lines = d.text.split('\n');
+  const an = analyze(lines);
+  el.reader.classList.toggle('with-syl', !!settings.syllables);
+  let html = '', open = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) { if (open) { html += '</p>'; open = false; } continue; }
+    if (!open) { html += '<p>'; open = true; }
+    let body = '';
+    const m = settings.rhymes ? an.marks[i] : null;
+    if (m) {
+      let pos = 0;
+      for (const [s, e, c] of m) { if (s < pos) continue; body += esc(line.slice(pos, s)) + `<span class="rh" style="--tint:${TINTS[c % 8]}">${esc(line.slice(s, e))}</span>`; pos = e; }
+      body += esc(line.slice(pos));
+    } else body = esc(line);
+    html += `<div class="rl">${body}${settings.syllables ? `<span class="syl">${an.syll[i]}</span>` : ''}</div>`;
+  }
+  if (open) html += '</p>';
+  el.reader.innerHTML = html;
 }
 function ensureCaretVisible() {
   const d = state.doc; if (!d || document.activeElement !== el.ta) return;
@@ -3103,8 +3127,8 @@ function onSettingChange(key) {
     case 'fontSize': applyEditorSize(); queueRender(); break;
     case 'visuals': Visuals.applyEnabled(); if (settings.visuals && (Sound.active || Metro.on)) Visuals.wake(); break;
     case 'intensity': if (!Visuals.running) Visuals.drawStatic(); break;
-    case 'syllables': root.setProperty('--gutter-w', settings.syllables ? '48px' : '0px'); queueRender(); break;
-    case 'synizesis': case 'rhymes': case 'rhymeStrict': case 'rhymeWindow': case 'rhymeLines': case 'internalRhymes': case 'linesPerBar': queueRender(); break;
+    case 'syllables': root.setProperty('--gutter-w', settings.syllables ? '48px' : '0px'); queueRender(); if (!state.editing) renderReader(); break;
+    case 'synizesis': case 'rhymes': case 'rhymeStrict': case 'rhymeWindow': case 'rhymeLines': case 'internalRhymes': case 'linesPerBar': queueRender(); if (!state.editing) renderReader(); break;
     case 'metroBpm': case 'metroSub': case 'metroAccent': case 'metroVol': Metro.render(); break;
     case 'beatsPerLine': AutoScroll.render(); break;
     case 'sort': sortFiles(); renderList(); break;
