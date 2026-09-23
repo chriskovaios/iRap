@@ -148,6 +148,7 @@
   .link-btn.dim { color: var(--label-2); font-weight: 500; }
 
   .doc { flex: 1; min-height: 0; overflow-y: auto; position: relative; scrollbar-width: thin; scrollbar-gutter: stable both-edges; }
+  .app:not(.reading) .doc, .app.reading:not(.picking) .reader { cursor: text; }
   .doc-inner { max-width: 720px; margin: 0 auto; padding: 28px 24px 45vh; }
   .doc-inner[hidden] { display: none; }
   .editor-wrap { position: relative; }
@@ -430,19 +431,14 @@
   }
   /* Ink is the text color pulled a step toward the background: paper-white, never blinding. */
   @supports (color: color-mix(in srgb, red, blue)) {
-    html[data-style="graffiti"] { --ink: color-mix(in srgb, var(--label) 82%, var(--bg)); }
+    html[data-style="graffiti"] { --ink: color-mix(in srgb, var(--label) 91%, var(--bg)); }
   }
   html[data-style="graffiti"] body, html[data-style="graffiti"] .reader, html[data-style="graffiti"] .cell .ttl, html[data-style="graffiti"] .row .lbl { color: var(--ink); }
   html[data-style="graffiti"] .ta { color: var(--ink); -webkit-text-fill-color: var(--ink); }
   html[data-style="graffiti"] .cell.active, html[data-style="graffiti"] .cell.active .ttl { color: var(--on-accent); }
-  /* Wall: a faint block grid like painted brick, plus two spray clouds in the accent colors. */
   html[data-style="graffiti"] body::before {
     content: ""; position: fixed; inset: 0; z-index: 1; pointer-events: none;
-    background:
-      radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), .16), transparent 34%),
-      radial-gradient(circle at 88% 84%, rgba(var(--accent2-rgb), .14), transparent 38%),
-      repeating-linear-gradient(0deg, rgba(var(--accent-rgb), .045) 0 1px, transparent 1px 30px),
-      repeating-linear-gradient(90deg, rgba(var(--accent-rgb), .035) 0 1px, transparent 1px 72px);
+    background: radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), .18), transparent 34%), radial-gradient(circle at 88% 84%, rgba(var(--accent2-rgb), .16), transparent 38%);
   }
   /* Paint drips under the sidebar title */
   html[data-style="graffiti"] .large-title { position: relative; display: inline-block; max-width: 100%; }
@@ -465,8 +461,7 @@
   html[data-style="graffiti"] .empty .ico { display: none; }
   /* Selected rows look hand-cut */
   html[data-style="graffiti"] .cell.active { clip-path: polygon(0 1.5%, 100% 0, 99.3% 100%, .7% 97%); }
-  /* Hazard-tape stripe along the toolbar */
-  html[data-style="graffiti"] .toolbar { border-top: 4px solid; border-image: repeating-linear-gradient(135deg, rgba(var(--accent-rgb), .85) 0 14px, rgba(var(--accent2-rgb), .85) 14px 28px) 4; }
+  html[data-style="graffiti"] .toolbar { border-top: 3px solid var(--ink); }
   html[data-style="graffiti"] .btn:hover, html[data-style="graffiti"] .small-btn:not([aria-pressed="true"]):hover { transform: rotate(-1.2deg); }
   html[data-style="graffiti"] .sidebar { border-right: 3px solid var(--ink); }
   html[data-style="graffiti"] .large-title, html[data-style="graffiti"] .card h1, html[data-style="graffiti"] .sheet-head h2, html[data-style="graffiti"] .now-title, html[data-style="graffiti"] .rec-time {
@@ -997,7 +992,7 @@ const THEMES = {
   asphalt:  { name: 'Asphalt',  scheme: 'dark',  bg: '#0B0C10', bg2: '#15171C', bg3: '#1E2128', label: '#F2EFE9', accent: '#FFB020', accent2: '#FF6A3D' },
   neon:     { name: 'Neon',     scheme: 'dark',  bg: '#050308', bg2: '#120A1A', bg3: '#1B1026', label: '#F5F0FF', accent: '#FF2BD6', accent2: '#00E5FF' },
   brick:    { name: 'Brick',    scheme: 'dark',  bg: '#1A0F0C', bg2: '#2A1712', bg3: '#3A211A', label: '#F6E9E0', accent: '#E2543A', accent2: '#F0B27A' },
-  graffiti: { name: 'Graffiti', scheme: 'dark',  bg: '#111014', bg2: '#1B1A20', bg3: '#25232B', label: '#E9E1D3', accent: '#AEF03C', accent2: '#FF4F98' },
+  graffiti: { name: 'Graffiti', scheme: 'dark',  bg: '#111014', bg2: '#1B1A20', bg3: '#25232B', label: '#F2ECE2', accent: '#AEF03C', accent2: '#FF4F98' },
   subway:   { name: 'Subway',   scheme: 'dark',  bg: '#101317', bg2: '#1A1F26', bg3: '#242B34', label: '#ECEFF3', accent: '#FFD100', accent2: '#EE352E' },
   concrete: { name: 'Concrete', scheme: 'light', bg: '#D9DADF', bg2: '#EDEEF1', bg3: '#FFFFFF', label: '#1C1C1E', accent: '#FF6A00', accent2: '#3A3D45' },
 };
@@ -2645,7 +2640,7 @@ function renderReader() {
       pos = e;
     }
     body += readerRange(line, pos, line.length, ws);
-    html += `<div class="rl">${body}${settings.syllables ? `<span class="syl">${an.syll[i]}</span>` : ''}</div>`;
+    html += `<div class="rl" data-l="${i}">${body}${settings.syllables ? `<span class="syl">${an.syll[i]}</span>` : ''}</div>`;
   }
   if (open) html += '</p>';
   el.reader.innerHTML = html;
@@ -3776,7 +3771,58 @@ const AutoScroll = {
 };
 el.scrollPill.addEventListener('click', () => AutoScroll.toggle());
 el.doc.addEventListener('wheel', () => { if (AutoScroll.active) AutoScroll.stop(); }, { passive: true });
-el.doc.addEventListener('touchstart', () => { if (AutoScroll.active) AutoScroll.stop(); }, { passive: true });
+el.doc.addEventListener('touchstart', () => { if (AutoScroll.active) { AutoScroll.stop(); state.pauseTapAt = Date.now(); } }, { passive: true });
+el.doc.addEventListener('mousedown', () => { if (AutoScroll.active) { AutoScroll.stop(); state.pauseTapAt = Date.now(); } });
+
+/* The whole frame is the editor: a click in the margins or below the text starts editing there,
+   and in reading view a click on the text jumps into editing at that spot. */
+function lineOffset(lines, li) { let start = 0; for (let i = 0; i < li && i < lines.length; i++) start += lines[i].length + 1; return start; }
+function lineElementAtY(elements, y) {
+  let before = null;
+  for (const n of elements) {
+    const r = n.getBoundingClientRect();
+    if (y >= r.top && y <= r.bottom) return { node: n, where: 'in' };
+    if (r.bottom < y) before = n;
+  }
+  return before ? { node: before, where: 'after' } : (elements.length ? { node: elements[0], where: 'before' } : null);
+}
+el.doc.addEventListener('click', e => {
+  const d = state.doc; if (!d) return;
+  if (e.target === el.ta || e.target.closest('.scroll-pill, .pickbar, button, a, .rh')) return;
+  if (e.ctrlKey || e.metaKey || Picker.mode) return;
+  if (Date.now() - (state.pauseTapAt || 0) < 600) return;   // that tap only paused the auto-scroll
+  const lines = d.text.split('\n');
+  let pos;
+  if (!state.editing) {
+    const hit = lineElementAtY($$('.rl', el.reader), e.clientY);
+    if (!hit) pos = d.text.length;
+    else {
+      const li = Number(hit.node.dataset.l) || 0, len = (lines[li] || '').length;
+      let off = hit.where === 'before' ? 0 : len;
+      if (hit.where === 'in') {
+        try {
+          const cp = document.caretPositionFromPoint ? document.caretPositionFromPoint(e.clientX, e.clientY) : null;
+          const cr = !cp && document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+          const node = cp ? cp.offsetNode : cr ? cr.startContainer : null, o = cp ? cp.offset : cr ? cr.startOffset : 0;
+          if (node && hit.node.contains(node)) { const r = document.createRange(); r.selectNodeContents(hit.node); r.setEnd(node, o); off = Math.min(len, r.toString().length); }
+        } catch { /* keep the end of the line */ }
+      }
+      pos = lineOffset(lines, li) + off;
+    }
+    setEditing(true, true);
+  } else {
+    const hit = lineElementAtY(Array.from(el.mirror.children), e.clientY);
+    if (!hit) pos = d.text.length;
+    else {
+      const li = Array.prototype.indexOf.call(el.mirror.children, hit.node), len = (lines[li] || '').length;
+      const r = el.editorWrap.getBoundingClientRect();
+      pos = lineOffset(lines, li) + (hit.where === 'before' ? 0 : hit.where === 'after' ? len : (e.clientX < r.left + r.width / 2 ? 0 : len));
+    }
+  }
+  el.ta.focus();
+  try { el.ta.setSelectionRange(pos, pos); } catch { /* ignore */ }
+  caretDirty = true; requestAnimationFrame(ensureCaretVisible);
+});
 
 /* ============================================================
    Settings sheet binding
