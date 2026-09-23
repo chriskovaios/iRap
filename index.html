@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-style="graffiti">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -419,6 +419,89 @@
   .toast { position: fixed; left: 50%; bottom: calc(var(--toolbar-h) + var(--wave-h) + 18px + var(--safe-b)); transform: translate(-50%, 16px); opacity: 0; z-index: 30; background: var(--bg-3); color: var(--label); padding: 10px 16px; border-radius: 20px; font-size: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.3); transition: opacity .25s, transform .25s var(--ease); pointer-events: none; max-width: min(90%, 520px); text-align: center; }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
+  /* ===== Graffiti style: block-letter titles, sticker cards with hard shadows, marker labels, spray haze.
+     Same layout and color themes as the iPhone style; every rule below only adds on top. ===== */
+  html[data-style="graffiti"] {
+    --font-display: Impact, "Arial Black", "Futura-CondensedExtraBold", "Franklin Gothic Heavy", "Segoe UI Black", system-ui, sans-serif;
+    --font-tag: "Marker Felt", "Segoe Print", "Bradley Hand", "Chalkboard SE", "Comic Sans MS", cursive;
+    --radius: 14px 6px 12px 8px;
+    --ink: var(--label);
+    --sticker: 3px 3px 0 var(--ink);
+  }
+  html[data-style="graffiti"] body::before {
+    content: ""; position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), .18), transparent 34%), radial-gradient(circle at 88% 84%, rgba(var(--accent2-rgb), .16), transparent 38%);
+  }
+  html[data-style="graffiti"] .sidebar { border-right: 3px solid var(--ink); }
+  html[data-style="graffiti"] .large-title, html[data-style="graffiti"] .card h1, html[data-style="graffiti"] .sheet-head h2, html[data-style="graffiti"] .now-title, html[data-style="graffiti"] .rec-time {
+    font-family: var(--font-display); font-weight: 900; text-transform: uppercase; letter-spacing: .01em; transform: skewX(-6deg);
+    text-shadow: 3px 3px 0 var(--accent-2); -webkit-text-stroke: .5px rgba(0,0,0,.35);
+  }
+  html[data-style="graffiti"] .large-title { font-size: 38px; text-decoration: underline wavy var(--accent); text-decoration-thickness: 3px; text-underline-offset: 7px; padding-bottom: 6px; line-height: 1.15; }
+  html[data-style="graffiti"] .doc-title { font-family: var(--font-display); text-transform: uppercase; font-size: 19px; letter-spacing: .02em; text-shadow: 2px 2px 0 var(--accent-2); }
+  html[data-style="graffiti"] .sec-title, html[data-style="graffiti"] .group-head, html[data-style="graffiti"] .label, html[data-style="graffiti"] .doc-status, html[data-style="graffiti"] .counts, html[data-style="graffiti"] .rec-hint, html[data-style="graffiti"] .now-sub, html[data-style="graffiti"] .cell .sub, html[data-style="graffiti"] .row .desc {
+    font-family: var(--font-tag); text-transform: none; letter-spacing: 0; color: var(--accent-2);
+  }
+  html[data-style="graffiti"] .sec-title, html[data-style="graffiti"] .group-head, html[data-style="graffiti"] .label { font-size: 16px; }
+  html[data-style="graffiti"] .cell .sub, html[data-style="graffiti"] .row .desc, html[data-style="graffiti"] .doc-status, html[data-style="graffiti"] .counts { font-size: 14px; }
+  html[data-style="graffiti"] .cell.active .sub { color: inherit; }
+  html[data-style="graffiti"] .inset, html[data-style="graffiti"] .card, html[data-style="graffiti"] .as-group, html[data-style="graffiti"] .alert, html[data-style="graffiti"] .menu, html[data-style="graffiti"] .pickbar, html[data-style="graffiti"] .scroll-pill, html[data-style="graffiti"] .toast, html[data-style="graffiti"] .yt-pane {
+    border: 2px solid var(--ink); border-radius: var(--radius); box-shadow: 5px 5px 0 rgba(var(--accent-rgb), .9);
+  }
+  html[data-style="graffiti"] .inset { margin-bottom: 26px; }
+  html[data-style="graffiti"] .cell + .cell::before, html[data-style="graffiti"] .row + .row::before { height: 0; background: none; border-top: 2px dashed var(--separator); }
+  html[data-style="graffiti"] .cell .ttl { font-weight: 700; }
+  html[data-style="graffiti"] .btn, html[data-style="graffiti"] .small-btn, html[data-style="graffiti"] .nav-btn, html[data-style="graffiti"] .tb-btn, html[data-style="graffiti"] .as-btn, html[data-style="graffiti"] .alert-btns button, html[data-style="graffiti"] .link-btn {
+    font-family: var(--font-display); text-transform: uppercase; letter-spacing: .05em; font-weight: 900;
+  }
+  html[data-style="graffiti"] .tb-track { font-family: var(--font); text-transform: none; letter-spacing: 0; font-weight: 500; }
+  html[data-style="graffiti"] .btn, html[data-style="graffiti"] .small-btn { border: 2px solid var(--ink); border-radius: 10px 4px 10px 4px; box-shadow: var(--sticker); transition: transform .08s, box-shadow .08s; }
+  html[data-style="graffiti"] .icon-btn { border: 2px solid var(--ink); border-radius: 8px 3px 8px 3px; box-shadow: 2px 2px 0 var(--ink); }
+  html[data-style="graffiti"] .cell-more { border: 0; box-shadow: none; }
+  html[data-style="graffiti"] .btn:active, html[data-style="graffiti"] .small-btn:active, html[data-style="graffiti"] .icon-btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  html[data-style="graffiti"] .small-btn[aria-pressed="true"] { transform: skewX(-4deg); }
+  html[data-style="graffiti"] .tb-btn[aria-pressed="true"] { border-radius: 9px 3px 9px 3px; transform: skewX(-4deg); }
+  html[data-style="graffiti"] .switch { border: 2px solid var(--ink); border-radius: 6px; width: 54px; height: 30px; box-shadow: 2px 2px 0 var(--ink); }
+  html[data-style="graffiti"] .switch::after { border-radius: 3px; width: 22px; height: 22px; top: 2px; left: 2px; box-shadow: none; background: var(--ink); }
+  html[data-style="graffiti"] .switch[aria-checked="true"] { background: var(--accent); }
+  html[data-style="graffiti"] .switch[aria-checked="true"]::after { transform: translateX(24px); background: var(--on-accent); }
+  html[data-style="graffiti"] .seg { border: 2px solid var(--ink); border-radius: 10px 4px 10px 4px; background: transparent; padding: 3px; }
+  html[data-style="graffiti"] .seg button { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .04em; border-radius: 7px 3px 7px 3px; }
+  html[data-style="graffiti"] .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); box-shadow: none; transform: skewX(-6deg); }
+  html[data-style="graffiti"] .tb-seg button[aria-pressed="true"] { transform: none; }
+  html[data-style="graffiti"] .stepper { border: 2px solid var(--ink); border-radius: 8px 3px 8px 3px; background: transparent; }
+  html[data-style="graffiti"] .stepper .val { font-family: var(--font-display); }
+  html[data-style="graffiti"] .nav, html[data-style="graffiti"] .toolbar { background: rgba(var(--bg-rgb), .94); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  html[data-style="graffiti"] .nav { border-bottom: 3px solid var(--ink); }
+  html[data-style="graffiti"] .toolbar { border-top: 3px solid var(--ink); }
+  html[data-style="graffiti"] .wavebar { border-top: 2px dashed var(--separator); }
+  html[data-style="graffiti"] .wave-vol { border-left: 2px dashed var(--separator); }
+  html[data-style="graffiti"] .banner { border-bottom: 2px dashed var(--ink); font-family: var(--font-tag); font-size: 15px; }
+  html[data-style="graffiti"] .sheet { border: 3px solid var(--ink); border-bottom: 0; border-radius: 22px 8px 0 0; box-shadow: 0 -6px 0 rgba(var(--accent-rgb), .9); }
+  html[data-style="graffiti"] .grabber { width: 60px; height: 6px; border-radius: 2px; background: var(--accent); }
+  html[data-style="graffiti"] .search { border: 2px solid var(--ink); border-radius: 10px 4px 10px 4px; background: transparent; }
+  html[data-style="graffiti"] .side-seg { margin-bottom: 10px; }
+  html[data-style="graffiti"] .mirror .rh, html[data-style="graffiti"] .reader .rh { border-radius: 3px 10px 4px 12px; }
+  html[data-style="graffiti"] .mirror .rh.pk, html[data-style="graffiti"] .reader .rh.pk { outline: 2px solid var(--ink); }
+  html[data-style="graffiti"] .reader { font-weight: 600; }
+  html[data-style="graffiti"] .reader .syl, html[data-style="graffiti"] .gutter span { font-family: var(--font-tag); color: var(--accent-2); font-size: 14px; }
+  html[data-style="graffiti"] .ta, html[data-style="graffiti"] .mirror { font-weight: 500; }
+  html[data-style="graffiti"] button:focus-visible, html[data-style="graffiti"] input:focus-visible, html[data-style="graffiti"] textarea:focus-visible { outline: 3px dashed var(--accent); }
+  html[data-style="graffiti"] kbd { border: 2px solid var(--ink); border-radius: 6px 2px 6px 2px; font-family: var(--font-display); text-transform: uppercase; color: var(--label); background: transparent; }
+  html[data-style="graffiti"] .swatch { border-radius: 10px 4px 10px 4px; border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }
+  html[data-style="graffiti"] .swatch[aria-pressed="true"]::after { border-radius: 12px 6px 12px 6px; border: 2px dashed var(--accent); inset: -6px; }
+  html[data-style="graffiti"] .pick-swatch { border-radius: 6px 2px 6px 2px; box-shadow: 2px 2px 0 var(--ink); }
+  html[data-style="graffiti"] .dot { border-radius: 4px 1px 4px 1px; }
+  html[data-style="graffiti"] .app-icon { border: 3px solid var(--ink); border-radius: 18px 6px 18px 6px; box-shadow: 5px 5px 0 var(--ink); transform: rotate(-3deg); }
+  html[data-style="graffiti"] .rec-btn { border: 3px solid var(--ink); border-radius: 18px 6px 18px 6px; box-shadow: 3px 3px 0 var(--ink); }
+  html[data-style="graffiti"] .rec-dot { border-radius: 12px 4px 12px 4px; }
+  html[data-style="graffiti"] .tr-btn.big { border: 3px solid var(--ink); border-radius: 22px 8px 22px 8px; box-shadow: 4px 4px 0 var(--ink); }
+  html[data-style="graffiti"] .toast { font-family: var(--font-tag); font-size: 16px; }
+  html[data-style="graffiti"] .toast.show { transform: translate(-50%, 0) rotate(-1.5deg); }
+  html[data-style="graffiti"] .time, html[data-style="graffiti"] .wave-time, html[data-style="graffiti"] .times, html[data-style="graffiti"] .tb-loop-label { font-family: var(--font-display); letter-spacing: .03em; }
+  html[data-style="graffiti"] .yt-form input { border: 2px solid var(--ink); border-radius: 10px 4px 10px 4px; background: transparent; }
+  html[data-style="graffiti"] .rules-box { box-shadow: 5px 5px 0 rgba(var(--accent2-rgb), .9); }
+
   @media (max-width: 760px) {
     .sidebar { width: 100%; border-right: 0; }
     .app[data-view="doc"] .sidebar { display: none; }
@@ -591,6 +674,7 @@
   <div class="sheet-body">
     <div class="sec-title">Theme</div>
     <div class="inset">
+      <div class="row"><div><div class="lbl">Style</div><div class="desc">Graffiti stickers and block letters, or the plain iPhone look</div></div><div class="ctl"><div class="seg" data-setting="uiStyle"><button data-value="graffiti">Graffiti</button><button data-value="ios">iPhone</button></div></div></div>
       <div class="swatches" id="swatches"></div>
       <div id="customTheme" hidden>
         <div class="row"><div class="lbl">Background</div><div class="ctl"><input type="color" data-color="bg" aria-label="Background color"></div></div>
@@ -851,7 +935,7 @@ $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
    Settings
    ============================================================ */
 const DEFAULTS = {
-  theme: 'system', grain: false, fontSize: 18,
+  theme: 'graffiti', uiStyle: 'graffiti', grain: false, fontSize: 18,
   visuals: true, intensity: 60,
   syllables: true, synizesis: true, linesPerBar: 1,
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
@@ -928,6 +1012,7 @@ function applyTheme() {
   r.setProperty('--fill-2', dark ? 'rgba(120,120,128,.18)' : 'rgba(120,120,128,.12)');
   r.setProperty('--accent', t.accent); r.setProperty('--accent-2', t.accent2);
   r.setProperty('--accent-rgb', hexToRgb(t.accent).join(','));
+  r.setProperty('--accent2-rgb', hexToRgb(t.accent2).join(','));
   r.setProperty('--on-accent', luminance(hexToRgb(t.accent)) > .4 ? '#000000' : '#FFFFFF');
   r.setProperty('--danger', dark ? '#FF453A' : '#FF3B30'); r.setProperty('--ok', dark ? '#30D158' : '#34C759');
   r.colorScheme = t.scheme;
@@ -3683,6 +3768,7 @@ function onSettingChange(key) {
     case 'metroBpm': case 'metroSub': case 'metroAccent': case 'metroVol': Metro.render(); break;
     case 'beatsPerLine': AutoScroll.render(); break;
     case 'takeFormat': Demos.render(); break;
+    case 'uiStyle': applyStyle(); Wave.draw(true); break;
     case 'sort': sortFiles(); renderList(); break;
     default: break;
   }
@@ -4746,8 +4832,10 @@ function applyEditorSize() {
   root.setProperty('--editor-size', `${size}px`);
   root.setProperty('--editor-line', `${Math.round(size * 1.55)}px`);
 }
+function applyStyle() { document.documentElement.dataset.style = settings.uiStyle === 'ios' ? 'ios' : 'graffiti'; }
 function applyInitialSettings() {
   const root = document.documentElement.style;
+  applyStyle();
   applyEditorSize();
   root.setProperty('--gutter-w', settings.syllables ? '48px' : '0px');
   el.grain.hidden = !settings.grain;
