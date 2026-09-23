@@ -89,6 +89,11 @@
   .group-head .chev svg { width: 16px; height: 16px; transition: transform .25s var(--ease); }
   .group-head[aria-expanded="true"] .chev svg { transform: rotate(90deg); }
   .group-note { font-size: 14px; color: var(--label-3); text-align: center; padding: 18px 12px; margin: 0; line-height: 1.4; }
+  .group-head.static { cursor: default; }
+  .side-seg { display: flex; margin: 4px 16px 6px; }
+  .side-seg button { flex: 1; text-align: center; }
+  .cell.track .ttl { font-weight: 500; }
+  .cell.active .cell-more { color: inherit; }
   .inset { list-style: none; margin: 0; padding: 0; background: var(--bg-2); border-radius: var(--radius); overflow: hidden; transition: background-color var(--dur); }
   .inset:empty { display: none; }
   .cell {
@@ -464,7 +469,23 @@
       </div>
       <button class="icon-btn" id="btnNew" title="New lyric or folder (Alt+N for a lyric)" aria-label="New lyric or folder"><span data-icon="plus"></span></button>
     </div>
-    <label class="search"><span class="ico" data-icon="search"></span><input id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search lyrics"></label>
+    <div class="seg side-seg" id="sideMode"><button data-mode="lyrics" aria-pressed="true">Lyrics</button><button data-mode="music" aria-pressed="false">Music</button></div>
+    <label class="search"><span class="ico" data-icon="search"></span><input id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search"></label>
+    <div class="list-scroll" id="musicScroll" hidden>
+      <section class="group" id="musicPlaylistGroup" hidden>
+        <div class="group-head static"><span>Playlist</span></div>
+        <ul class="inset" id="musicPlaylist"></ul>
+      </section>
+      <section class="group">
+        <ul class="inset" id="musicList"></ul>
+        <p class="group-note" id="musicEmpty" hidden></p>
+        <div class="btn-row" id="musicActions" hidden><button class="btn secondary" id="musicChoose">Choose Music Folder…</button></div>
+      </section>
+      <section class="group" id="musicTakesGroup" hidden>
+        <div class="group-head static"><span id="musicTakesTitle">Takes</span></div>
+        <ul class="inset" id="musicTakes"></ul>
+      </section>
+    </div>
     <div class="list-scroll" id="listScroll">
       <section class="group">
         <ul class="inset" id="fileList"></ul>
@@ -476,7 +497,10 @@
         <button class="text-btn danger" id="btnEmptyTrash" hidden>Delete All Forever</button>
       </section>
     </div>
-    <div class="side-foot"><button class="text-btn" id="btnFolder" title="Folder"><span class="ico" data-icon="folder"></span><span id="folderName">Folder</span></button></div>
+    <div class="side-foot">
+      <button class="text-btn" id="btnFolder" title="Lyrics folder"><span class="ico" data-icon="folder"></span><span id="folderName">Folder</span></button>
+      <button class="text-btn" id="btnMusicFolder" title="Music folder" hidden><span class="ico" data-icon="music"></span><span id="musicFolderName">Choose Music Folder…</span></button>
+    </div>
   </aside>
 
   <main class="detail" id="detail">
@@ -1795,16 +1819,18 @@ const Player = {
     this.render();
     if (wasEmpty && this.items.length) this.play(0);
   },
-  // Replace the tracks that came from the music folder, keeping hand-picked files and whatever is playing.
-  setFolderItems(entries) {
+  // The browsed music folder's tracks become the beats list. Hand-added files, links and takes stay;
+  // a track from another folder that is still current stays too, so playback is never cut.
+  setFolderItems(entries, pathStr = '') {
     const current = this.items[this.idx] || null;
-    const kept = this.items.filter(x => !x.fromFolder || x === current);
-    for (const e of entries) {
-      if (current && current.fromFolder && current.name === e.name.replace(/\.[^.]+$/, '')) continue;
-      kept.push({ name: e.name.replace(/\.[^.]+$/, ''), file: null, handle: e.handle, fromFolder: true });
-    }
-    this.items = kept;
-    this.idx = current ? kept.indexOf(current) : -1;
+    const currentKey = current && current.fromFolder ? `${current.folderPath}/${current.fileName}` : null;
+    let keepCurrent = !!(current && current.fromFolder);
+    const folderItems = entries.map(e => {
+      if (currentKey === `${pathStr}/${e.name}`) { keepCurrent = false; return Object.assign({}, current, { handle: e.handle }); }   // keeps its decoded waveform
+      return { kind: 'file', name: e.name.replace(/\.[^.]+$/, ''), fileName: e.name, folderPath: pathStr, file: null, handle: e.handle, fromFolder: true };
+    });
+    this.items = this.items.filter(x => !x.fromFolder).concat(keepCurrent ? [current] : [], folderItems);
+    this.idx = current ? this.items.findIndex(it => it === current || (currentKey && it.fromFolder && `${it.folderPath}/${it.fileName}` === currentKey)) : -1;
     this.render();
   },
   pendingSeek: null,
@@ -1967,7 +1993,7 @@ const Player = {
       const x = this.items[i];
       const icon = x.kind === 'yt' ? ICONS.screen : x.kind === 'take' ? ICONS.mic : ICONS.music;
       const sub = x.kind === 'yt' ? '<div class="sub">YouTube</div>' : x.kind === 'take' ? '<div class="sub">Take</div>' : '';
-      const rm = x.kind === 'yt' || x.kind === 'take' ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button>` : '';
+      const rm = !x.fromFolder ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button>` : '';
       return `<li class="cell pl-cell${i === this.idx ? ' active' : ''}" data-i="${i}"><span class="ico">${icon}</span><div class="txt"><div class="ttl">${esc(x.name)}</div>${sub}</div>${rm}</li>`;
     }).join('');
     el.plEmpty.hidden = pool.length > 0;
@@ -1977,6 +2003,7 @@ const Player = {
     if (needTick && !this.loopTimer) this.loopTimer = setInterval(() => this.tick(), 40);
     if (!needTick && this.loopTimer) { clearInterval(this.loopTimer); this.loopTimer = null; }
     if (Sheet.current === el.sheet_demos) Demos.render();
+    Music.render();
   },
   // Play a recorded take through the main player, so the waveform, transport and volume all apply to it.
   playTake(x, rel) {
@@ -1986,7 +2013,7 @@ const Player = {
     this.play(i);
   },
   removeItem(i) {
-    const it = this.items[i]; if (!it || (it.kind !== 'yt' && it.kind !== 'take')) return;
+    const it = this.items[i]; if (!it || it.fromFolder) return;   // folder tracks come and go with the browsed folder
     if (i === this.idx) { this.pauseAll(); YT.hide(); this.idx = -1; } else if (i < this.idx) this.idx--;
     this.items.splice(i, 1);
     if (it.kind === 'yt') this.saveLinks();
@@ -2426,7 +2453,7 @@ const markStyle = c => (c >= 0 ? ` style="--tint:${TINTS[c % 8]}"` : '');
 /* ============================================================
    Application state
    ============================================================ */
-const state = { files: [], folders: [], trash: [], path: [], dir: null, tree: null, dragRel: null, doc: null, picks: [], editing: true, filter: '', paused: false, trashOpen: false, snippets: new Map(), queues: new Map() };
+const state = { files: [], folders: [], trash: [], path: [], dir: null, tree: null, dragRel: null, doc: null, picks: [], sideMode: 'lyrics', editing: true, filter: '', paused: false, trashOpen: false, snippets: new Map(), queues: new Map() };
 const stem = n => n.replace(/\.txt$/i, '');
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('lyrics-studio') : null;
 const broadcast = msg => { if (channel && FS.folderId) channel.postMessage(Object.assign({ folderId: FS.folderId, tab: TAB_ID }, msg)); };
@@ -2739,9 +2766,11 @@ async function ensureTree() {
 }
 function renderList() {
   const q = state.filter.trim().toLowerCase();
-  el.sideTitle.textContent = isRoot() ? 'Lyrics' : state.path[state.path.length - 1];
-  el.btnUp.hidden = isRoot();
-  el.btnUp.lastElementChild.textContent = state.path.length > 1 ? state.path[state.path.length - 2] : 'Lyrics';
+  if (state.sideMode !== 'music') {
+    el.sideTitle.textContent = isRoot() ? 'Lyrics' : state.path[state.path.length - 1];
+    el.btnUp.hidden = isRoot();
+    el.btnUp.lastElementChild.textContent = state.path.length > 1 ? state.path[state.path.length - 2] : 'Lyrics';
+  }
   const snip = rel => (state.snippets.get(rel) || {}).text || '';
   const fileCell = (f, sub) => `<li class="cell${state.doc && state.doc.rel === f.rel ? ' active' : ''}" data-rel="${esc(f.rel)}" role="button" tabindex="0" draggable="true"><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>${esc(sub)}</div></div></li>`;
   if (q) {
@@ -2803,7 +2832,8 @@ async function openFile(entry, opts = {}) {
   el.docInner.hidden = false; el.emptyDoc.hidden = true; el.docTitle.textContent = stem(entry.name);
   renderMirror(); renderReader(); setEditing(state.editing, true);
   Picker.render();
-  Demos.syncNames(state.doc).catch(e => console.warn(e));
+  if (state.sideMode === 'music') Demos.refresh().catch(e => console.warn(e));
+  else Demos.syncNames(state.doc).catch(e => console.warn(e));
   if (opts.force) { el.doc.scrollTop = prevScroll; try { el.ta.setSelectionRange(Math.min(prevSel[0], text.length), Math.min(prevSel[1], text.length)); } catch { /* ignore */ } }
   else el.doc.scrollTop = 0;
   renderList(); showDoc();
@@ -3141,6 +3171,7 @@ const Beats = {
     await safe(() => DB.set('beats', this.saved));
     this.handle = dir; this.needsReopen = false;
     await this.load(dir, true);
+    setSideMode('music', true);
   },
   async restore() {
     const saved = await safe(() => Promise.race([DB.get('beats'), new Promise(res => setTimeout(() => res(null), 8000))]));
@@ -3161,18 +3192,20 @@ const Beats = {
     await this.load(this.handle, !silent);
     return true;
   },
+  // Opening the music folder means browsing it: the sidebar's Music mode shows its folders and tracks.
   async load(dir, announce) {
-    const entries = [];
-    try {
-      for await (const entry of dir.values()) if (entry.kind === 'file' && Player.isAudioName(entry.name)) entries.push({ name: entry.name, handle: entry });
-    } catch (e) {
-      console.warn(e);
-      if (isPermissionError(e)) { this.needsReopen = true; Player.render(); } else toast('Could not read the music folder');
-      return;
+    Music.reset();
+    await Music.navigate(LS.get('lyr:musicPath', []));
+    Player.render();
+    if (announce) {
+      const n = Music.tracks.length, f = Music.folders.length;
+      toast(n || f ? `“${dir.name}” · ${plural(n, 'track')}${f ? ` and ${plural(f, 'folder')}` : ''} at the top level` : 'No audio files or folders found in that folder', 2600);
     }
-    entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    Player.setFolderItems(entries);
-    if (announce) toast(entries.length ? `${plural(entries.length, 'track')} from “${dir.name}”` : 'No audio files found in that folder');
+  },
+  async countAudio(dir) {
+    let n = 0;
+    try { for await (const e of dir.values()) if (e.kind === 'file' && Player.isAudioName(e.name)) n++; } catch { /* ignore */ }
+    return n;
   },
 };
 
@@ -3261,6 +3294,156 @@ el.plAttach.addEventListener('click', () => {
   if (rec && rec.beat && Bindings.matches(rec, Player.current())) Bindings.detach(); else Bindings.attachCurrent();
 });
 setInterval(() => { if (!Player.paused()) { Loops.save(Player.current()); if (state.doc) Bindings.saveState(state.doc); } }, 20000);
+
+/* ============================================================
+   Sidebar Music mode: browse the music folder (subfolders included), the playlist, and the open lyric's takes
+   ============================================================ */
+function setSideMode(mode, silent) {
+  state.sideMode = mode === 'music' ? 'music' : 'lyrics';
+  LS.set('lyr:sideMode', state.sideMode);
+  const music = state.sideMode === 'music';
+  $$('button', el.sideMode).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === state.sideMode)));
+  el.listScroll.hidden = music; el.musicScroll.hidden = !music;
+  el.btnFolder.hidden = music; el.btnMusicFolder.hidden = !music;
+  el.search.placeholder = music ? 'Search this folder' : 'Search';
+  if (state.filter) { state.filter = ''; el.search.value = ''; }
+  if (music) {
+    if (Beats.handle && !Music.dir) Music.navigate(LS.get('lyr:musicPath', [])); else Music.render();
+    if (state.doc) Demos.refresh().catch(e => console.warn(e));
+  } else renderList();
+  if (!silent) showList();
+}
+const Music = {
+  path: [], dir: null, folders: [], tracks: [], seq: 0,
+  pathStr() { return this.path.join('/'); },
+  reset() { this.path = []; this.dir = null; this.folders = []; this.tracks = []; },
+  async navigate(path) {
+    if (!Beats.handle) { this.reset(); this.render(); return; }
+    let dir = Beats.handle; const ok = [];
+    for (const seg of path || []) { try { dir = await dir.getDirectoryHandle(seg); ok.push(seg); } catch { break; } }
+    this.path = ok; this.dir = dir; LS.set('lyr:musicPath', ok);
+    if (state.filter) { state.filter = ''; el.search.value = ''; }
+    await this.refresh();
+    el.musicScroll.scrollTop = 0;
+  },
+  async refresh() {
+    const seq = ++this.seq;
+    if (!this.dir) { this.folders = []; this.tracks = []; this.render(); return; }
+    const folders = [], tracks = [];
+    try {
+      for await (const e of this.dir.values()) {
+        if (e.name.startsWith('.')) continue;
+        if (e.kind === 'directory') folders.push({ name: e.name, handle: e, count: null });
+        else if (Player.isAudioName(e.name)) tracks.push({ name: e.name, handle: e });
+      }
+    } catch (e) {
+      console.warn(e);
+      if (isPermissionError(e)) { Beats.needsReopen = true; this.reset(); Player.render(); } else toast('Could not read the music folder');
+      this.render(); return;
+    }
+    if (seq !== this.seq) return;
+    folders.sort((a, b) => collator.compare(a.name, b.name)); tracks.sort((a, b) => collator.compare(a.name, b.name));
+    this.folders = folders; this.tracks = tracks;
+    // The browsed folder becomes the beats list, unless a track from another folder is playing right now.
+    const cur = Player.current();
+    if (!(cur && cur.fromFolder && !Player.paused() && cur.folderPath !== this.pathStr())) Player.setFolderItems(tracks, this.pathStr());
+    this.render();
+    for (const f of folders) { f.count = await Beats.countAudio(f.handle); if (seq !== this.seq) return; }
+    this.render();
+  },
+  up() { this.navigate(this.path.slice(0, -1)); },
+  playTrack(name) {
+    if (!this.tracks.some(x => x.name === name)) return;
+    Player.setFolderItems(this.tracks, this.pathStr());
+    const i = Player.items.findIndex(it => it.fromFolder && it.folderPath === this.pathStr() && it.fileName === name);
+    if (i < 0) return;
+    if (i === Player.idx) Player.toggle(); else Player.play(i);
+  },
+  addToPlaylist(name) {
+    const t = this.tracks.find(x => x.name === name); if (!t) return;
+    if (Player.items.some(it => !it.fromFolder && it.kind === 'file' && it.fileName === name && it.folderPath === this.pathStr())) { toast('Already in the playlist', 1200); return; }
+    Player.items.push({ kind: 'file', name: name.replace(/\.[^.]+$/, ''), fileName: name, folderPath: this.pathStr(), file: null, handle: t.handle, fromFolder: false });
+    Player.render(); toast(`Added “${name.replace(/\.[^.]+$/, '')}” to the playlist`, 1400);
+  },
+  async attachTrack(name) {
+    const t = this.tracks.find(x => x.name === name), d = state.doc;
+    if (!t || !d) { toast('Open a lyric first', 1400); return; }
+    const beat = { kind: 'file', name: name.replace(/\.[^.]+$/, ''), handle: t.handle };
+    await Bindings.put(d.rel, Object.assign({}, (await Bindings.get(d.rel)) || {}, { beat, time: 0, loopA: null, loopB: null, loopOn: true, bpm: settings.metroBpm }));
+    Player.render(); toast(`Attached “${beat.name}” to “${stem(d.name)}”`, 2000);
+  },
+  trackMenu(anchor, name) {
+    Menu.open(anchor, [
+      { label: 'Play', icon: 'play', onClick: () => this.playTrack(name) },
+      { label: 'Add to Playlist', icon: 'plus', onClick: () => this.addToPlaylist(name) },
+      ...(state.doc ? [{ label: `Attach to “${stem(state.doc.name)}”`, icon: 'music', onClick: () => this.attachTrack(name) }] : []),
+    ]);
+  },
+  render() {
+    if (state.sideMode !== 'music') return;
+    const q = state.filter.trim().toLowerCase(), hit = s => !q || String(s).toLowerCase().includes(q);
+    el.sideTitle.textContent = this.path.length ? this.path[this.path.length - 1] : 'Music';
+    el.btnUp.hidden = !this.path.length;
+    el.btnUp.lastElementChild.textContent = this.path.length > 1 ? this.path[this.path.length - 2] : 'Music';
+    el.musicFolderName.textContent = Beats.handle ? Beats.handle.name : Beats.needsReopen ? 'Reopen music folder' : 'Choose Music Folder…';
+    const cur = Player.current(), playing = !Player.paused();
+    const stateIcon = fallback => (playing ? ICONS.pause : ICONS.play) || fallback;
+    // Playlist: added files and links, not the browsed folder and not takes
+    const extra = []; Player.items.forEach((it, i) => { if (!it.fromFolder && it.kind !== 'take' && hit(it.name)) extra.push({ it, i }); });
+    el.musicPlaylist.innerHTML = extra.map(({ it, i }) => {
+      const active = it === cur, sub = it.kind === 'yt' ? 'YouTube' : it.folderPath != null ? (it.folderPath || (Beats.handle ? Beats.handle.name : 'Music folder')) : 'File';
+      return `<li class="cell${active ? ' active' : ''}" data-mitem="${i}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : it.kind === 'yt' ? ICONS.screen : ICONS.music}</span><div class="txt"><div class="ttl">${esc(it.name)}</div><div class="sub">${esc(sub)}</div></div><button class="icon-btn cell-more" data-mremove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button></li>`;
+    }).join('');
+    el.musicPlaylistGroup.hidden = !extra.length;
+    // Folder browser
+    if (!Beats.handle) {
+      el.musicList.innerHTML = '';
+      el.musicEmpty.hidden = false;
+      el.musicEmpty.textContent = Beats.needsReopen ? 'Your music folder is remembered. Reopen it to browse your beats.' : FS.supported ? 'Choose a music folder to browse your beats here, subfolders included.' : 'Add files or YouTube links with +. Browsing a music folder needs a desktop Chromium browser.';
+      el.musicActions.hidden = !FS.supported;
+      el.musicChoose.textContent = Beats.needsReopen ? 'Reopen Music Folder' : 'Choose Music Folder…';
+    } else {
+      const ps = this.pathStr();
+      const folders = this.folders.filter(f => hit(f.name)).map(f => `<li class="cell folder" data-mdir="${esc(f.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl">${esc(f.name)}</div><div class="sub">${f.count == null ? 'Folder' : plural(f.count, 'track')}</div></div><span class="ico chev">${ICONS.chev}</span></li>`);
+      const tracks = this.tracks.filter(t => hit(t.name)).map(t => {
+        const active = !!cur && cur.fromFolder && cur.folderPath === ps && cur.fileName === t.name;
+        return `<li class="cell track${active ? ' active' : ''}" data-mtrack="${esc(t.name)}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : ICONS.music}</span><div class="txt"><div class="ttl">${esc(t.name.replace(/\.[^.]+$/, ''))}</div><div class="sub">${esc(t.name.split('.').pop().toUpperCase())}</div></div><button class="icon-btn cell-more" data-mmore="${esc(t.name)}" aria-label="Track options" title="Track options">${ICONS.more}</button></li>`;
+      });
+      el.musicList.innerHTML = folders.join('') + tracks.join('');
+      el.musicEmpty.hidden = !!(folders.length || tracks.length);
+      el.musicEmpty.textContent = q ? 'No matches in this folder' : 'No audio files or folders here.';
+      el.musicActions.hidden = true;
+    }
+    // Takes of the open lyric
+    const takes = state.doc ? Demos.list : [];
+    el.musicTakesGroup.hidden = !takes.length;
+    el.musicTakesTitle.textContent = state.doc ? `Takes · ${stem(state.doc.name)}` : 'Takes';
+    el.musicTakes.innerHTML = takes.map((x, i) => {
+      const active = !!cur && cur.kind === 'take' && cur.takeName === x.name;
+      return `<li class="cell${active ? ' active' : ''}" data-mtake="${i}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : ICONS.mic}</span><div class="txt"><div class="ttl">${esc(x.name.slice(Demos.prefix(state.doc).length).replace(/\.[^.]+$/, ''))}</div><div class="sub"><b>${esc(fmtDate(x.modified))}</b>${esc(fmtSize(x.size))}</div></div></li>`;
+    }).join('');
+  },
+};
+el.sideMode.addEventListener('click', e => { const b = e.target.closest('button[data-mode]'); if (b) setSideMode(b.dataset.mode, true); });
+el.musicScroll.addEventListener('click', e => {
+  const more = e.target.closest('[data-mmore]'); if (more) { e.stopPropagation(); Music.trackMenu(more, more.dataset.mmore); return; }
+  const rm = e.target.closest('[data-mremove]'); if (rm) { e.stopPropagation(); Player.removeItem(+rm.dataset.mremove); return; }
+  const c = e.target.closest('.cell'); if (!c) return;
+  if (c.dataset.mdir != null) Music.navigate(Music.path.concat(c.dataset.mdir));
+  else if (c.dataset.mtrack != null) Music.playTrack(c.dataset.mtrack);
+  else if (c.dataset.mitem != null) { const i = +c.dataset.mitem; if (i === Player.idx) Player.toggle(); else Player.play(i); }
+  else if (c.dataset.mtake != null) Demos.play(+c.dataset.mtake);
+});
+el.musicScroll.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const c = e.target.closest('.cell'); if (c && !e.target.closest('button')) { e.preventDefault(); c.click(); } } });
+el.musicScroll.addEventListener('contextmenu', e => { const c = e.target.closest('.cell.track'); if (!c) return; e.preventDefault(); Music.trackMenu(c, c.dataset.mtrack); });
+el.musicChoose.addEventListener('click', () => (Beats.needsReopen ? Beats.reopen(false) : Beats.pick()));
+el.btnMusicFolder.addEventListener('click', async () => {
+  if (!FS.supported) { toast('Browsing a music folder needs a desktop Chromium browser', 2600); return; }
+  if (Beats.needsReopen) { Beats.reopen(false); return; }
+  if (!Beats.handle) { Beats.pick(); return; }
+  const i = await actionSheet({ title: Beats.handle.name, message: 'Beats are read from this folder and its subfolders.', actions: [{ label: 'Choose Another Music Folder…' }] });
+  if (i === 0) Beats.pick();
+});
 
 let volumeBeforeMute = 100;
 function setVolume(v, fromSlider) {
@@ -3566,7 +3749,7 @@ el.fileList.addEventListener('contextmenu', e => {
   e.preventDefault();
   folderMenu(c, c.dataset.dir);
 });
-el.btnUp.addEventListener('click', () => navigate(state.path.slice(0, -1)));
+el.btnUp.addEventListener('click', () => { if (state.sideMode === 'music') Music.up(); else navigate(state.path.slice(0, -1)); });
 // Drag a lyric onto a folder (or onto the back button) to move it there.
 el.fileList.addEventListener('dragstart', e => {
   const c = e.target.closest('.cell[data-rel]'); if (!c) return;
@@ -3600,14 +3783,19 @@ el.trashToggle.addEventListener('click', () => { state.trashOpen = !state.trashO
 el.btnEmptyTrash.addEventListener('click', emptyTrash);
 el.search.addEventListener('input', () => {
   state.filter = el.search.value;
+  if (state.sideMode === 'music') { Music.render(); return; }   // music search stays within the browsed folder
   renderList();
-  if (state.filter.trim()) ensureTree();   // search spans every folder in the tree
+  if (state.filter.trim()) ensureTree();   // lyric search spans every folder in the tree
 });
 el.search.addEventListener('keydown', e => {
-  if (e.key === 'Enter') activateCell($('.cell', el.fileList));
-  else if (e.key === 'Escape') { el.search.value = ''; state.filter = ''; renderList(); el.search.blur(); }
+  if (e.key === 'Enter') { if (state.sideMode === 'music') { const c = $('.cell', el.musicScroll); if (c) c.click(); } else activateCell($('.cell', el.fileList)); }
+  else if (e.key === 'Escape') { el.search.value = ''; state.filter = ''; if (state.sideMode === 'music') Music.render(); else renderList(); el.search.blur(); }
 });
-el.btnNew.addEventListener('click', () => Menu.open(el.btnNew, [
+el.btnNew.addEventListener('click', () => Menu.open(el.btnNew, state.sideMode === 'music' ? [
+  { label: 'Add Files…', icon: 'music', onClick: () => el.fileAudio.click() },
+  { label: 'Add YouTube Link…', icon: 'screen', onClick: async () => { const v = await alertPrompt({ title: 'YouTube Link', placeholder: 'Paste a link', ok: 'Add' }); if (v) Player.addLink(v); } },
+  ...(FS.supported ? [{ label: Beats.handle ? 'Change Music Folder…' : 'Choose Music Folder…', icon: 'folder', onClick: () => Beats.pick() }] : []),
+] : [
   { label: 'New Lyric', icon: 'doc', onClick: createFile },
   { label: 'New Folder', icon: 'folder', onClick: createFolder },
 ]));
@@ -4014,6 +4202,7 @@ const Demos = {
       this.syncNames(d).catch(e => console.warn(e));
     }
     this.render();
+    Music.render();
   },
   render() {
     const d = state.doc, ok = this.supported();
@@ -4578,6 +4767,7 @@ async function boot() {
   syncSettingsUI();
   Player.loadLinks();
   Player.render();
+  setSideMode(LS.get('lyr:sideMode', 'lyrics'), true);
   el.plAddFolder.hidden = !FS.supported;
   el.btnStorageChoose.hidden = !FS.supported;
   showScreen('loading');
