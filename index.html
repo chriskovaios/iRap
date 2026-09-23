@@ -174,6 +174,49 @@
   .reader.with-syl .rl { padding: 0 34px; }
   .reader .rh { background: var(--tint); box-shadow: 0 0 0 3px var(--tint); border-radius: 5px; }
   .reader .syl { position: absolute; left: 0; top: 0; font-size: 12px; color: var(--label-3); font-variant-numeric: tabular-nums; line-height: inherit; }
+  .reader .rh { cursor: pointer; }
+  .mirror .rh, .reader .rh { --tint: transparent; }
+  .mirror .rh.pk, .reader .rh.pk { outline: 2px dashed var(--accent); outline-offset: 2px; }
+  .app.picking .ta, .app.picking .reader .w { cursor: crosshair; }
+
+  /* Rhyme picker bar */
+  .pickbar {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--toolbar-h) + var(--wave-h) + 12px + var(--safe-b)); z-index: 4;
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: calc(100% - 24px);
+    padding: 8px 10px; border-radius: 14px; background: var(--bg-3); border: 1px solid var(--separator); box-shadow: 0 8px 30px rgba(0,0,0,.3); font-size: 13px;
+  }
+  .pickbar[hidden] { display: none; }
+  .app.reading .pickbar { bottom: calc(var(--toolbar-h) + var(--wave-h) + 64px + var(--safe-b)); }
+  .pick-words { color: var(--label-2); max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pick-colors { display: inline-flex; gap: 6px; }
+  .pick-swatch { width: 22px; height: 22px; border-radius: 50%; border: 0; cursor: pointer; background: var(--tint); box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); padding: 0; transition: transform .15s var(--ease); }
+  .pick-swatch:hover { transform: scale(1.15); }
+  .pick-swatch:disabled { opacity: .3; cursor: default; transform: none; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--tint); flex: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+  /* “ - ” reads as a short pause; “~” pulls two words together */
+  .reader .pause { display: inline-block; width: .9em; height: .14em; background: var(--label-3); border-radius: 1px; vertical-align: middle; margin: 0 .38em; }
+  .reader .tie { display: inline-block; width: .55em; height: .32em; border: 1.5px solid var(--accent); border-top: 0; border-radius: 0 0 .6em .6em; vertical-align: -.38em; margin: 0 .03em; opacity: .85; }
+
+  /* Rhyme rules editor */
+  .rules-box { padding: 0; }
+  .rules { display: block; width: 100%; background: none; border: 0; outline: 0; color: var(--label); font: inherit; font-size: 16px; line-height: 1.5; padding: 12px 14px; resize: vertical; min-height: 56px; }
+  .rules::placeholder { color: var(--label-3); }
+
+  /* Demo recorder */
+  .rec-panel { display: flex; align-items: center; gap: 16px; padding: 6px 4px 18px; }
+  .rec-btn { width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--label-3); background: none; display: grid; place-items: center; cursor: pointer; flex: none; padding: 0; }
+  .rec-btn:disabled { opacity: .4; cursor: default; }
+  .rec-dot { width: 46px; height: 46px; border-radius: 50%; background: var(--danger); transition: width .25s var(--ease), height .25s var(--ease), border-radius .25s var(--ease); }
+  .rec-btn.on .rec-dot { width: 26px; height: 26px; border-radius: 6px; }
+  .rec-btn.on { border-color: var(--danger); animation: recpulse 1.2s ease-in-out infinite; }
+  @keyframes recpulse { 50% { box-shadow: 0 0 0 7px rgba(255,69,58,.22); } }
+  .rec-info { flex: 1; min-width: 0; }
+  .rec-time { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1.1; }
+  .rec-hint { font-size: 13px; color: var(--label-2); margin-top: 2px; }
+  .rec-level { height: 4px; border-radius: 2px; background: var(--fill-2); margin-top: 10px; overflow: hidden; }
+  .rec-level div { height: 100%; width: 0; background: var(--ok); transition: width .08s linear; }
+  .icon-btn.rec { color: var(--danger); animation: recpulse 1.2s ease-in-out infinite; }
+  .demo-cell .icon-btn { flex: none; }
   .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--label-3); text-align: center; padding: 24px; pointer-events: none; }
   .empty[hidden] { display: none; }
   .empty p { margin: 12px 0 0; font-size: 15px; }
@@ -435,6 +478,7 @@
       </div>
       <div class="nav-actions">
         <button class="nav-btn" id="btnEdit">Done</button>
+        <button class="icon-btn" id="btnDemos" aria-label="Demos" title="Demos · record a take"><span data-icon="mic"></span></button>
         <button class="icon-btn" id="btnMore" aria-label="More actions"><span data-icon="more"></span></button>
       </div>
     </header>
@@ -453,6 +497,13 @@
     </div>
     <div class="counts" id="counts"></div>
     <button class="scroll-pill" id="scrollPill" title="Auto-scroll (Space)"><span id="scrollPillIcon" data-icon="play"></span><span id="scrollPillText">Auto-scroll</span></button>
+    <div class="pickbar" id="pickbar" hidden>
+      <span class="pick-words" id="pickWords"></span>
+      <span class="pick-colors" id="pickColors"></span>
+      <button class="small-btn" id="pickUngroup" title="Remove the picked words from their groups">Ungroup</button>
+      <button class="small-btn" id="pickClear" title="Clear picks, connected groups and automatic tints in this lyric">Clear</button>
+      <button class="small-btn" id="pickMode" aria-pressed="false" title="Pick words by tapping, without Ctrl">Pick mode</button>
+    </div>
     <div class="wavebar" id="wavebar">
       <div class="wave-main">
         <canvas id="wave" aria-label="Track position"></canvas>
@@ -526,7 +577,8 @@
       <div class="row"><div class="lbl">Match</div><div class="ctl"><div class="seg" data-setting="rhymeStrict"><button data-value="1">Last syllable</button><button data-value="2">Two syllables</button></div></div></div>
       <div class="row"><div class="lbl">Compare within</div><div class="ctl"><div class="seg" data-setting="rhymeWindow"><button data-value="stanza">Stanza</button><button data-value="lines">Nearby lines</button></div></div></div>
       <div class="row"><div class="lbl">Nearby lines</div><div class="ctl"><div class="stepper" data-setting="rhymeLines" data-min="2" data-max="16"><button data-step="-1" aria-label="Fewer">−</button><span class="val"></span><button data-step="1" aria-label="More">+</button></div></div></div>
-      <div class="row"><div><div class="lbl">Internal rhymes</div><div class="desc">Also tint matching words inside lines</div></div><div class="ctl"><button class="switch" role="switch" data-setting="internalRhymes" aria-label="Internal rhymes"></button></div></div>
+      <div class="row"><div><div class="lbl">Internal rhymes</div><div class="desc">Tint rhyming words anywhere in nearby lines, not only at line ends</div></div><div class="ctl"><button class="switch" role="switch" data-setting="internalRhymes" aria-label="Internal rhymes"></button></div></div>
+      <div class="row"><div><div class="lbl">Rhyme rules</div><div class="desc">Your own endings, word groups and exceptions</div></div><div class="ctl"><button class="small-btn" id="setRhymeRules">Edit…</button></div></div>
     </div>
 
     <div class="sec-title">Metronome</div>
@@ -556,6 +608,7 @@
       <div class="row"><span class="lbl">Tap tempo</span><kbd>Alt T</kbd></div>
       <div class="row"><span class="lbl">New lyric</span><kbd>Alt N</kbd></div>
       <div class="row"><span class="lbl">Auto-scroll (reading view)</span><kbd>Space</kbd></div>
+      <div class="row"><span class="lbl">Pick a word for a rhyme group</span><kbd>Ctrl click</kbd></div>
       <div class="row"><span class="lbl">Search</span><kbd>Ctrl K</kbd></div>
       <div class="row"><span class="lbl">Edit / read</span><kbd>Ctrl E</kbd></div>
       <div class="row"><span class="lbl">Sidebar</span><kbd>Ctrl \</kbd></div>
@@ -622,6 +675,46 @@
   </div>
 </section>
 
+<section class="sheet" id="sheet_rhymes" role="dialog" aria-label="Rhyme rules">
+  <div class="grabber"></div>
+  <div class="sheet-head"><h2>Rhyme Rules</h2><button class="nav-btn" data-close>Done</button></div>
+  <div class="sheet-body">
+    <div class="sec-title">This lyric</div>
+    <div class="inset"><div class="row"><div><div class="lbl">Automatic rhymes here</div><div class="desc">Built-in matching, for this lyric only</div></div><div class="ctl"><button class="switch" role="switch" id="manualAuto" aria-checked="true" aria-label="Automatic rhymes in this lyric"></button></div></div></div>
+    <ul class="inset" id="manualList"></ul>
+    <p class="group-note" id="manualEmpty">No connected groups yet. Ctrl+click words in the lyric, or use Pick mode, then choose a color.</p>
+    <div class="btn-row"><button class="btn secondary" id="manualPickMode">Pick Words…</button></div>
+    <div class="sec-title">Endings that rhyme</div>
+    <div class="inset rules-box"><textarea class="rules" id="rulesEquiv" rows="4" spellcheck="false" placeholder="an = am = ang&#10;ος = ους" aria-label="Endings that rhyme"></textarea></div>
+    <p class="about">One set per line. Endings joined with = or commas count as the same sound, in any script. Applied after the built-in matching.</p>
+    <div class="sec-title">Words that rhyme together</div>
+    <div class="inset rules-box"><textarea class="rules" id="rulesGroups" rows="4" spellcheck="false" placeholder="orange, storage, door" aria-label="Words that rhyme together"></textarea></div>
+    <p class="about">One group per line, words separated by commas. In reading view, tap a tinted word to add it quickly.</p>
+    <div class="sec-title">Never highlight</div>
+    <div class="inset rules-box"><textarea class="rules" id="rulesIgnore" rows="2" spellcheck="false" placeholder="the, a, και" aria-label="Words never highlighted"></textarea></div>
+    <p class="about" id="rulesStatus"></p>
+  </div>
+</section>
+
+<section class="sheet" id="sheet_demos" role="dialog" aria-label="Demos">
+  <div class="grabber"></div>
+  <div class="sheet-head"><h2 id="demoTitle">Demos</h2><button class="nav-btn" data-close>Done</button></div>
+  <div class="sheet-body">
+    <div class="rec-panel">
+      <button class="rec-btn" id="recBtn" aria-label="Start recording"><span class="rec-dot"></span></button>
+      <div class="rec-info">
+        <div class="rec-time" id="recTime">0:00</div>
+        <div class="rec-hint" id="recHint">Tap to record a take</div>
+        <div class="rec-level"><div id="recLevel"></div></div>
+      </div>
+    </div>
+    <div class="sec-title">Takes</div>
+    <ul class="inset" id="demoList"></ul>
+    <p class="group-note" id="demoEmpty">No takes yet. Record one above.</p>
+    <p class="about" id="demoNote"></p>
+  </div>
+</section>
+
 <section class="sheet" id="sheet_move" role="dialog" aria-label="Move to folder">
   <div class="grabber"></div>
   <div class="sheet-head"><h2 id="mvTitle">Move</h2><button class="nav-btn" data-close>Cancel</button></div>
@@ -640,6 +733,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileAudio" accept="audio/*" multiple hidden>
 <audio id="audio" hidden></audio>
+<audio id="demoAudio" hidden></audio>
 
 <script>
 (() => {
@@ -701,6 +795,8 @@ const ICONS = {
   repeat: '<svg viewBox="0 0 24 24"><path d="M17 3.5l3 3-3 3"/><path d="M20 6.5H8a4 4 0 0 0-4 4v1.5"/><path d="M7 20.5l-3-3 3-3"/><path d="M4 17.5h12a4 4 0 0 0 4-4V12"/></svg>',
   speaker: '<svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4 3.5v-12l-4 3.5z"/><path d="M15 9.5a3.5 3.5 0 0 1 0 5"/><path d="M17.5 7a7 7 0 0 1 0 10"/></svg>',
   speakerOff: '<svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4 3.5v-12l-4 3.5z"/><path d="M15.5 9.5l4 5M19.5 9.5l-4 5"/></svg>',
+  mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5v3M9 20.5h6"/></svg>',
+  wave: '<svg viewBox="0 0 24 24"><path d="M3 12h2.5l2-6 3 12 3-9 2 5 2-2H21"/></svg>',
 };
 const setIcon = (node, name) => { node.innerHTML = ICONS[name] || ''; node.dataset.icon = name; };
 $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
@@ -713,6 +809,7 @@ const DEFAULTS = {
   visuals: true, intensity: 60,
   syllables: true, synizesis: true, linesPerBar: 1,
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
+  rhymeEquiv: [], rhymeGroups: [], rhymeIgnore: [],
   metroBpm: 90, metroSub: 1, metroAccent: true, metroVol: 60,
   sort: 'modified', sidebar: true, beatsPerLine: 4, volume: 100,
   customTheme: null, lastPreset: 'system',
@@ -723,7 +820,8 @@ const LS = {
   del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
 };
 const settings = Object.assign({}, DEFAULTS, LS.get('lyr:settings', {}) || {});
-const saveSettings = () => LS.set('lyr:settings', settings);
+// Settings live in localStorage and, once a folder is open, in lyrics-settings.yaml inside it.
+function saveSettings() { LS.set('lyr:settings', settings); SettingsFile.schedule(); }
 
 /* ============================================================
    Themes
@@ -801,6 +899,7 @@ function applyTheme() {
     if (sw) { sw.style.setProperty('--sw-bg', t.bg); sw.style.setProperty('--sw-ac', t.accent); }
   }
   themeListeners.forEach(fn => fn({ palette: [a, b, mid], dark }));
+  if (el.pickColors) buildPickSwatches();
   if (state.doc && !state.editing) renderReader();   // rhyme tints follow the theme in reading view too
 }
 function buildSwatches() {
@@ -1044,7 +1143,7 @@ const FS = {
   async listSubdirs(dir, root) {
     const out = [];
     for await (const entry of dir.values()) {
-      if (entry.kind !== 'directory' || entry.name.startsWith('.') || (root && entry.name === 'Trash')) continue;
+      if (entry.kind !== 'directory' || entry.name.startsWith('.') || (root && entry.name === 'Trash') || /^demos$/i.test(entry.name)) continue;
       out.push({ name: entry.name, handle: entry, count: 0 });
     }
     return out;
@@ -1058,7 +1157,7 @@ const FS = {
     if (depth > 8 || out.length > 3000) return;
     for await (const entry of dir.values()) {
       if (entry.name.startsWith('.')) continue;
-      if (entry.kind === 'directory') { if (depth === 0 && entry.name === 'Trash') continue; await this.walk(entry, path.concat(entry.name), out, depth + 1); }
+      if (entry.kind === 'directory') { if ((depth === 0 && entry.name === 'Trash') || /^demos$/i.test(entry.name)) continue; await this.walk(entry, path.concat(entry.name), out, depth + 1); }
       else if (/\.txt$/i.test(entry.name)) {
         let f; try { f = await entry.getFile(); } catch { continue; }
         out.push({ name: entry.name, handle: entry, modified: f.lastModified, size: f.size, path, rel: path.concat(entry.name).join('/') });
@@ -1112,7 +1211,7 @@ const FS = {
   async exists(dir, name) { try { await dir.getFileHandle(name); return true; } catch { return false; } },
 
   async uniqueName(dir, base) {
-    const m = base.match(/^(.*?)(\.txt)$/i);
+    const m = base.match(/^(.*?)(\.[A-Za-z0-9]{1,8})$/);
     const stem = m ? m[1] : base, ext = m ? m[2] : '';
     let name = base, i = 2;
     while (await this.exists(dir, name)) name = `${stem} ${i++}${ext}`;
@@ -1246,6 +1345,8 @@ const Sheet = {
     if (name === 'history') renderHistory();
     if (name === 'player') Player.render();
     if (name === 'settings') syncSettingsUI();
+    if (name === 'demos') Demos.refresh();
+    if (name === 'rhymes') RulesUI.fill();
   },
   close() {
     if (!this.current) return;
@@ -1562,6 +1663,7 @@ const Loops = {
     const keys = Object.keys(all);
     if (keys.length > 200) keys.sort((x, y) => (all[x].u || 0) - (all[y].u || 0)).slice(0, keys.length - 200).forEach(x => { delete all[x]; });
     LS.set('lyr:loops', all);
+    SettingsFile.schedule();
   },
 };
 
@@ -1586,7 +1688,7 @@ const Player = {
     this.play(i);
     return true;
   },
-  saveLinks() { LS.set('lyr:yt', this.items.filter(x => x.kind === 'yt').map(x => ({ id: x.id, name: x.name }))); },
+  saveLinks() { LS.set('lyr:yt', this.items.filter(x => x.kind === 'yt').map(x => ({ id: x.id, name: x.name }))); SettingsFile.schedule(); },
   loadLinks() {
     const saved = LS.get('lyr:yt', []);
     if (!Array.isArray(saved)) return;
@@ -1624,6 +1726,7 @@ const Player = {
     const it = this.items[i]; if (!it) return;
     const autoplay = opts.autoplay !== false;
     this.idx = i;
+    if (autoplay) el.demoAudio.pause();
     const saved = Loops.get(it) || {};
     this.loopA = opts.loopA != null ? opts.loopA : (saved.a != null ? saved.a : null);
     this.loopB = opts.loopB != null ? opts.loopB : (saved.b != null ? saved.b : null);
@@ -1692,9 +1795,9 @@ const Player = {
       return;
     }
     Sound.ensure();
-    if (el.audio.paused) el.audio.play().catch(() => {}); else el.audio.pause();
+    if (el.audio.paused) { el.demoAudio.pause(); el.audio.play().catch(() => {}); } else el.audio.pause();
   },
-  pauseAll() { el.audio.pause(); if (YT.playing) YT.pause(); },
+  pauseAll() { el.audio.pause(); if (YT.playing) YT.pause(); el.demoAudio.pause(); },
   fallbackId: null,
   // Shown when a video cannot play embedded: title, reason, and a button to watch it on YouTube.
   ytFallback(it, msg) {
@@ -2045,27 +2148,70 @@ function latinKey(w, strict) {
   const g = groups[idx];
   if (groups.length > 1 && g[0] === 'e' && g.index === w.length - 1 && !/le$/.test(w)) idx--;
   idx = Math.max(0, idx - (strict - 1));
-  const k = w.slice(groups[idx].index).replace(/ck/g, 'k').replace(/ph/g, 'f').replace(/c(?=[eiy])/g, 's').replace(/c/g, 'k').replace(/(.)\1+/g, '$1');
+  const k = latinNorm(w.slice(groups[idx].index));
   return k || null;
 }
+function latinNorm(s) { return s.replace(/ck/g, 'k').replace(/ph/g, 'f').replace(/c(?=[eiy])/g, 's').replace(/c/g, 'k').replace(/(.)\1+/g, '$1'); }
+const cleanWord = s => normWord(String(s)).replace(/[^\p{L}\p{M}]/gu, '');
+const baseKey = w => (isGreek(w) ? greekKey(w, settings.rhymeStrict) : latinKey(w, settings.rhymeStrict));
+
+/* User rhyme rules: ending equivalences, explicit word groups, ignored words (all editable, saved with settings). */
+const Rules = {
+  cache: null, sig: '',
+  build() {
+    const sig = JSON.stringify([settings.rhymeEquiv, settings.rhymeGroups, settings.rhymeIgnore, settings.rhymeStrict]);
+    if (this.cache && this.sig === sig) return this.cache;
+    const ignore = new Set((settings.rhymeIgnore || []).map(cleanWord).filter(Boolean));
+    const groupKey = new Map();
+    (settings.rhymeGroups || []).forEach((g, i) => {
+      const words = (Array.isArray(g) ? g : []).map(cleanWord).filter(Boolean);
+      if (words.length < 2) return;
+      const k = baseKey(words[0]) || `grp${i}`;
+      for (const w of words) groupKey.set(w, k);
+    });
+    const equiv = [];
+    for (const cls of settings.rhymeEquiv || []) {
+      const ends = (Array.isArray(cls) ? cls : []).map(e => { const c = cleanWord(e); return c ? (isGreek(c) ? greekPhon(c) : latinNorm(c)) : ''; }).filter(Boolean);
+      if (ends.length < 2) continue;
+      for (const e of ends.slice(1)) if (e !== ends[0]) equiv.push([e, ends[0]]);
+    }
+    equiv.sort((a, b) => b[0].length - a[0].length);
+    this.cache = { ignore, groupKey, equiv }; this.sig = sig;
+    return this.cache;
+  },
+};
 function rhymeKey(word) {
-  const w = normWord(word).replace(/[^\p{L}\p{M}]/gu, '');
+  const w = cleanWord(word);
   if (w.length < 2) return null;
-  return isGreek(w) ? greekKey(w, settings.rhymeStrict) : latinKey(w, settings.rhymeStrict);
+  const r = Rules.cache || Rules.build();
+  if (r.ignore.has(w)) return null;
+  let k = r.groupKey.get(w) || baseKey(w);
+  if (!k) return null;
+  for (const [e, canon] of r.equiv) if (k.endsWith(e)) { k = k.slice(0, k.length - e.length) + canon; break; }
+  return k;
 }
+const VOWEL_ANY = /[aeiouyàáâäãåèéêëìíîïòóôöõùúûüýœæαεηιουωάέήίόύώϊϋΐΰ]/;
+const endsVowel = w => VOWEL_ANY.test(normWord(w).replace(/[^\p{L}]+$/u, '').slice(-1));
+const startsVowel = w => VOWEL_ANY.test(normWord(w).replace(/^[^\p{L}]+/u, '').charAt(0));
 
 function analyze(lines) {
+  Rules.build();
   const n = lines.length, syll = new Array(n).fill(0), words = new Array(n), last = new Array(n).fill(null);
   let total = 0;
   for (let i = 0; i < n; i++) {
     const ws = Array.from(lines[i].matchAll(WORD_RE));
     words[i] = ws;
     let s = 0; for (const m of ws) s += syllablesWord(m[0]);
+    // “word~word” runs two vowels together into one syllable (synaloepha)
+    for (let k = 1; k < ws.length && s > 1; k++) {
+      const between = lines[i].slice(ws[k - 1].index + ws[k - 1][0].length, ws[k].index);
+      if (/^\s*~\s*$/.test(between) && endsVowel(ws[k - 1][0]) && startsVowel(ws[k][0])) s--;
+    }
     syll[i] = s; total += s;
     if (ws.length) { const m = ws[ws.length - 1]; last[i] = { key: rhymeKey(m[0]), s: m.index, e: m.index + m[0].length }; }
   }
   const marks = new Array(n).fill(null);
-  if (settings.rhymes) {
+  if (settings.rhymes && !(state.doc && state.doc.rhymesOff)) {
     const stanza = new Array(n); let st = -1;
     for (let i = 0; i <= n; i++) {
       const blank = i === n || !lines[i].trim();
@@ -2076,36 +2222,89 @@ function analyze(lines) {
     const range = i => settings.rhymeWindow === 'stanza' ? (stanza[i] || [i, i + 1]) : [Math.max(0, i - N + 1), Math.min(n, i + N)];
     const colorOf = new Map(); let next = 0;
     const color = k => { if (!colorOf.has(k)) colorOf.set(k, next++); return colorOf.get(k); };
-    const endMarked = new Array(n).fill(false);
+    // Line endings: any two endings in the window that share a sound (repeats of the same word count too).
     for (let i = 0; i < n; i++) {
       const L = last[i]; if (!L || !L.key) continue;
       const [a, b] = range(i); let hit = false;
       for (let j = a; j < b; j++) if (j !== i && last[j] && last[j].key === L.key) { hit = true; break; }
-      if (hit) { marks[i] = [[L.s, L.e, color(L.key)]]; endMarked[i] = true; }
+      if (hit) marks[i] = [[L.s, L.e, color(L.key)]];
     }
+    // Internal rhymes: every word in the window is a candidate, so inner words rhyme with each other,
+    // not only with line endings. A sound needs two different words (3+ letters) before it is tinted.
     if (settings.internalRhymes) {
+      const keyCache = new Map();
+      const keyOf = w => { if (!keyCache.has(w)) keyCache.set(w, rhymeKey(w)); return keyCache.get(w); };
+      const toks = words.map(ws => ws.map(m => { const w = cleanWord(m[0]); return { s: m.index, e: m.index + m[0].length, w, key: w.length >= 3 ? keyOf(m[0]) : null }; }));
+      const statsCache = new Map();
+      const statsFor = (a, b) => {
+        const id = `${a}:${b}`;
+        let st = statsCache.get(id); if (st) return st;
+        st = new Map();
+        for (let j = a; j < b; j++) for (const t of toks[j]) {
+          if (!t.key) continue;
+          let r = st.get(t.key); if (!r) { r = { n: 0, words: new Set() }; st.set(t.key, r); }
+          r.n++; r.words.add(t.w);
+        }
+        statsCache.set(id, st);
+        return st;
+      };
       for (let i = 0; i < n; i++) {
-        const ws = words[i]; if (ws.length < 2) continue;
-        const [a, b] = range(i); const keys = new Set();
-        for (let j = a; j < b; j++) if (last[j] && last[j].key) keys.add(last[j].key);
-        for (let k = 0; k < ws.length - 1; k++) {
-          const key = rhymeKey(ws[k][0]);
-          if (!key || !keys.has(key)) continue;
+        const ts = toks[i]; if (!ts.length) continue;
+        const [a, b] = range(i), st = statsFor(a, b);
+        const starts = new Set((marks[i] || []).map(x => x[0]));
+        for (const t of ts) {
+          if (!t.key || starts.has(t.s)) continue;
+          const r = st.get(t.key);
+          if (!r || r.n < 2 || r.words.size < 2) continue;
           marks[i] = marks[i] || [];
-          marks[i].push([ws[k].index, ws[k].index + ws[k][0].length, color(key)]);
-          if (!endMarked[i] && last[i] && last[i].key === key) { marks[i].push([last[i].s, last[i].e, color(key)]); endMarked[i] = true; }
+          marks[i].push([t.s, t.e, color(t.key)]); starts.add(t.s);
         }
         if (marks[i]) marks[i].sort((x, y) => x[0] - y[0]);
       }
     }
   }
-  return { syll, marks, total };
+  // Hand-picked groups for this lyric (from the picker) and pending picks. Marks carry [start, end, color, kind].
+  const manual = (state.doc && Array.isArray(state.doc.rhymes)) ? state.doc.rhymes : [];
+  const picks = state.picks || [];
+  if (manual.length || picks.length) {
+    const cw = words.map(ws => ws.map(m => cleanWord(m[0])));
+    const phraseToks = p => String(p).split(/\s+/).map(cleanWord).filter(Boolean);
+    const eachOccurrence = (toks, fn) => {
+      if (!toks.length) return;
+      for (let i = 0; i < n; i++) {
+        const c = cw[i];
+        for (let k = 0; k + toks.length <= c.length; k++) {
+          let ok = true;
+          for (let t = 0; t < toks.length; t++) if (c[k + t] !== toks[t]) { ok = false; break; }
+          if (ok) { const a = words[i][k], b = words[i][k + toks.length - 1]; fn(i, a.index, b.index + b[0].length); }
+        }
+      }
+    };
+    const manualMarks = lines.map(() => []), pickMarks = lines.map(() => []);
+    manual.forEach((g, gi) => { const col = Number.isInteger(g.color) ? g.color : gi; for (const p of g.words || []) eachOccurrence(phraseToks(p), (i, s, e) => manualMarks[i].push([s, e, col, 'm'])); });
+    for (const p of picks) eachOccurrence(phraseToks(p), (i, s, e) => pickMarks[i].push([s, e, -1, 'pk']));
+    for (let i = 0; i < n; i++) {
+      if (!manualMarks[i].length && !pickMarks[i].length) continue;
+      let list = (marks[i] || []).filter(a => !manualMarks[i].some(m => a[0] < m[1] && m[0] < a[1])).concat(manualMarks[i]);
+      for (const pk of pickMarks[i]) {
+        const hit = list.find(a => a[0] <= pk[0] && a[1] >= pk[1]);
+        if (hit) hit[3] = `${hit[3] || 'a'} pk`; else list.push(pk);
+      }
+      list.sort((x, y) => x[0] - y[0] || y[1] - x[1]);
+      const out = []; let end = -1;
+      for (const a of list) { if (a[0] < end) continue; out.push(a); end = a[1]; }
+      marks[i] = out.length ? out : null;
+    }
+  }
+  return { syll, marks, total, words };
 }
+const markClass = (c, kind) => 'rh' + (kind && kind.includes('pk') ? ' pk' : '');
+const markStyle = c => (c >= 0 ? ` style="--tint:${TINTS[c % 8]}"` : '');
 
 /* ============================================================
    Application state
    ============================================================ */
-const state = { files: [], folders: [], trash: [], path: [], dir: null, tree: null, dragRel: null, doc: null, editing: true, filter: '', paused: false, trashOpen: false, snippets: new Map(), queues: new Map() };
+const state = { files: [], folders: [], trash: [], path: [], dir: null, tree: null, dragRel: null, doc: null, picks: [], editing: true, filter: '', paused: false, trashOpen: false, snippets: new Map(), queues: new Map() };
 const stem = n => n.replace(/\.txt$/i, '');
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('lyrics-studio') : null;
 const broadcast = msg => { if (channel && FS.folderId) channel.postMessage(Object.assign({ folderId: FS.folderId, tab: TAB_ID }, msg)); };
@@ -2136,9 +2335,9 @@ function renderMirror() {
     const m = an.marks[i];
     if (!m) { html += `<div class="ln">${esc(line)}</div>`; continue; }
     let out = '', pos = 0;
-    for (const [s, e, c] of m) {
+    for (const [s, e, c, kind] of m) {
       if (s < pos) continue;
-      out += esc(line.slice(pos, s)) + `<span class="rh" style="--tint:${TINTS[c % 8]}">${esc(line.slice(s, e))}</span>`;
+      out += esc(line.slice(pos, s)) + `<span class="${markClass(c, kind)}"${markStyle(c)}>${esc(line.slice(s, e))}</span>`;
       pos = e;
     }
     html += `<div class="ln">${out}${esc(line.slice(pos))}</div>`;
@@ -2168,17 +2367,45 @@ function renderReader() {
     const line = lines[i];
     if (!line.trim()) { if (open) { html += '</p>'; open = false; } continue; }
     if (!open) { html += '<p>'; open = true; }
-    let body = '';
-    const m = settings.rhymes ? an.marks[i] : null;
-    if (m) {
-      let pos = 0;
-      for (const [s, e, c] of m) { if (s < pos) continue; body += esc(line.slice(pos, s)) + `<span class="rh" style="--tint:${TINTS[c % 8]}">${esc(line.slice(s, e))}</span>`; pos = e; }
-      body += esc(line.slice(pos));
-    } else body = esc(line);
+    const ws = an.words[i], ms = an.marks[i] || [];
+    let body = '', pos = 0;
+    for (const [s, e, c, kind] of ms) {
+      if (s < pos) continue;
+      body += readerRange(line, pos, s, ws);
+      body += `<span class="${markClass(c, kind)}" data-w="${esc(line.slice(s, e))}"${markStyle(c)}>${readerRange(line, s, e, ws)}</span>`;
+      pos = e;
+    }
+    body += readerRange(line, pos, line.length, ws);
     html += `<div class="rl">${body}${settings.syllables ? `<span class="syl">${an.syll[i]}</span>` : ''}</div>`;
   }
   if (open) html += '</p>';
   el.reader.innerHTML = html;
+}
+// A slice of a line for reading view: words wrapped (so they can be picked), gaps run through readerSeg.
+function readerRange(line, from, to, ws) {
+  if (from >= to) return '';
+  let out = '', pos = from, prevWord = ws.some(t => t.index + t[0].length === from);
+  for (const t of ws) {
+    const ts = t.index, te = ts + t[0].length;
+    if (te <= from) continue;
+    if (ts >= to) break;
+    const s = Math.max(ts, from), e = Math.min(te, to);
+    out += readerSeg(line.slice(pos, s), prevWord, true);
+    out += `<span class="w">${esc(line.slice(s, e))}</span>`;
+    pos = e; prevWord = true;
+  }
+  out += readerSeg(line.slice(pos, to), prevWord, ws.some(t => t.index === to));
+  return out;
+}
+// Text between words in reading view: “ - ” becomes a pause mark, “~” a tie that pulls the words together.
+const PAUSE_HTML = '<span class="pause" aria-hidden="true"></span>';
+const TIE_HTML = '<span class="tie" aria-hidden="true"></span>';
+function readerSeg(s, afterWord, beforeWord) {
+  if (!s) return '';
+  let h = esc(s);
+  if (s.includes('~')) h = h.replace(/\s*~\s*/g, TIE_HTML);
+  if (/[-–—]/.test(s) && !(afterWord && beforeWord && /^[-–—]$/.test(s))) h = h.replace(/\s*[-–—](?=\s|$)\s*/g, PAUSE_HTML);
+  return h;
 }
 function ensureCaretVisible() {
   const d = state.doc; if (!d || document.activeElement !== el.ta) return;
@@ -2446,9 +2673,15 @@ async function openFile(entry, opts = {}) {
   const prevScroll = el.doc.scrollTop, prevSel = [el.ta.selectionStart, el.ta.selectionEnd];
   state.doc = { name: entry.name, rel: entry.rel, path: (entry.path || state.path).slice(), dir: entry.dir || state.dir, handle: entry.handle, text, savedText: disk.text, bom: disk.bom, eol: disk.eol, modified: disk.modified, dirty: restored, lastSaved: 0 };
   LS.set(lastKey(), entry.rel);
+  state.picks = [];
+  const meta = await Manual.load(entry.rel);
+  if (state.doc.rel !== entry.rel) return;   // another lyric was opened meanwhile
+  state.doc.rhymes = meta.groups; state.doc.rhymesOff = meta.off;
   el.ta.value = text;
   el.docInner.hidden = false; el.emptyDoc.hidden = true; el.docTitle.textContent = stem(entry.name);
   renderMirror(); renderReader(); setEditing(state.editing, true);
+  Picker.render();
+  Demos.syncNames(state.doc).catch(e => console.warn(e));
   if (opts.force) { el.doc.scrollTop = prevScroll; try { el.ta.setSelectionRange(Math.min(prevSel[0], text.length), Math.min(prevSel[1], text.length)); } catch { /* ignore */ } }
   else el.doc.scrollTop = 0;
   renderList(); showDoc();
@@ -2456,6 +2689,7 @@ async function openFile(entry, opts = {}) {
   else setStatus(`Saved · ${fmtDate(disk.modified)}`);
   if (!opts.force && state.editing && innerWidth > 760) el.ta.focus();
   if (!opts.force) Bindings.restore(state.doc).catch(e => console.warn(e));
+  if (Sheet.current === el.sheet_demos) Demos.refresh();
 }
 async function reconcileDrafts() {
   const drafts = Drafts.all(); if (!drafts.length) return;
@@ -2492,6 +2726,7 @@ async function enterFolder() {
   el.folderName.textContent = FS.handle.name; el.setFolderName.textContent = FS.handle.name;
   closeDoc();
   state.dir = FS.handle; state.path = [];
+  await SettingsFile.load();
   const last = LS.get(lastKey(), null);
   const savedPath = LS.get(pathKey(), []);
   await navigate(typeof last === 'string' && last ? relDir(last) : (Array.isArray(savedPath) ? savedPath : []));
@@ -2507,6 +2742,7 @@ async function rekey(oldRel, newRel, draftText) {
   if (draftText != null) Drafts.set(newRel, draftText);
   await Snapshots.rename(oldRel, newRel);
   await Bindings.rename(oldRel, newRel);
+  await safe(() => Demos.rekey(oldRel, newRel));
   state.snippets.delete(oldRel);
   const last = LS.get(lastKey(), null); if (last === oldRel) LS.set(lastKey(), newRel);
 }
@@ -2526,6 +2762,8 @@ async function rekeyPrefix(oldPath, newPath) {
   } catch { /* ignore */ }
   const last = LS.get(lastKey(), null);
   if (typeof last === 'string' && last.startsWith(oldPath.join('/') + '/')) LS.set(lastKey(), newPath.join('/') + '/' + last.slice(oldPath.join('/').length + 1));
+  await safe(() => Demos.rekeyFolder(oldPath, newPath));
+  SettingsFile.schedule();
 }
 async function createFile() {
   if (!FS.handle) return;
@@ -2685,6 +2923,7 @@ async function trashActions(name) {
       toast(`Restored “${stem(newName)}” to ${pathLabel(destPath)}`, 2000);
       openRel(newRel);
     } else {
+      await safe(() => Demos.toTrash('Trash/' + name));
       await trash.removeEntry(name); await Bindings.remove('Trash/' + name);
       delete origins[name]; LS.set('lyr:trash-origin', origins);
       await refreshList(); broadcast({ type: 'list' }); toast('Deleted forever');
@@ -2697,7 +2936,8 @@ async function emptyTrash() {
   if (i !== 0) return;
   try {
     const trash = await FS.getTrash();
-    for (const f of state.trash) { await trash.removeEntry(f.name); await Bindings.remove('Trash/' + f.name); }
+    for (const f of state.trash) { await safe(() => Demos.toTrash('Trash/' + f.name)); await trash.removeEntry(f.name); await Bindings.remove('Trash/' + f.name); }
+    try { await trash.removeEntry('demos', { recursive: true }); } catch { /* no deleted takes */ }
     LS.set('lyr:trash-origin', {});
     await refreshList(); broadcast({ type: 'list' });
     toast('Recently Deleted is empty');
@@ -2832,8 +3072,14 @@ const Bindings = {
     rec.key = k; rec.name = name; rec.updated = Date.now();
     this.cache.set(k, rec);
     await safe(() => DB.putBinding(rec));
+    SettingsFile.schedule();
   },
-  async remove(name) { const k = this.key(name); this.cache.set(k, null); await safe(() => DB.delBinding(k)); },
+  async remove(name) { const k = this.key(name); this.cache.set(k, null); await safe(() => DB.delBinding(k)); SettingsFile.schedule(); },
+  // Store the record if anything meaningful is left in it, otherwise drop it.
+  async putOrRemove(name, rec) {
+    const keep = !!(rec.beat || (Array.isArray(rec.rhymes) && rec.rhymes.length) || rec.rhymesOff || (Array.isArray(rec.demos) && rec.demos.length));
+    if (keep) await this.put(name, rec); else await this.remove(name);
+  },
   async rename(oldName, newName) {
     const rec = await this.get(oldName); if (!rec) return;
     await this.remove(oldName); await this.put(newName, Object.assign({}, rec));
@@ -2849,13 +3095,15 @@ const Bindings = {
     if (!d) { toast('Open a lyric first'); return; }
     if (!it) { toast('Play a beat first, then attach it'); return; }
     const beat = it.kind === 'yt' ? { kind: 'yt', id: it.id, name: it.name } : { kind: 'file', name: it.name, handle: it.handle || null };
-    await this.put(d.rel, { beat, time: Player.time(), loopA: Player.loopA, loopB: Player.loopB, loopOn: Player.loopOn, bpm: settings.metroBpm });
+    await this.put(d.rel, Object.assign({}, (await this.get(d.rel)) || {}, { beat, time: Player.time(), loopA: Player.loopA, loopB: Player.loopB, loopOn: Player.loopOn, bpm: settings.metroBpm }));
     Player.render();
     toast(`Attached “${it.name}” to “${stem(d.name)}”`, 2200);
   },
   async detach() {
     const d = state.doc; if (!d) return;
-    await this.remove(d.rel);
+    const rec = Object.assign({}, (await this.get(d.rel)) || {});
+    for (const k of ['beat', 'time', 'loopA', 'loopB', 'loopOn', 'bpm']) delete rec[k];
+    await this.putOrRemove(d.rel, rec);
     Player.render();
     toast('Beat detached', 1400);
   },
@@ -2898,6 +3146,7 @@ let volumeBeforeMute = 100;
 function setVolume(v, fromSlider) {
   settings.volume = clamp(Math.round(v), 0, 100); saveSettings();
   el.audio.volume = settings.volume / 100;
+  el.demoAudio.volume = settings.volume / 100;
   YT.setVolume(settings.volume);
   el.plVol.value = String(settings.volume);
   el.waveVol.value = String(settings.volume);
@@ -3254,6 +3503,7 @@ el.btnMore.addEventListener('click', () => {
     { label: 'Move to Folder…', icon: 'folder', onClick: () => MoveUI.open(state.doc.rel) },
     { label: 'Duplicate', icon: 'copy', onClick: duplicateCurrent },
     { label: 'Download', icon: 'doc', onClick: downloadCurrent },
+    { label: 'Demos…', icon: 'mic', onClick: () => Sheet.open('demos') },
     { label: attached ? 'Detach Beat' : (rec && rec.beat ? 'Attach Current Beat Instead' : 'Attach Current Beat'), icon: 'music', onClick: () => (attached ? Bindings.detach() : Bindings.attachCurrent()) },
     { label: 'History', icon: 'clock', onClick: () => Sheet.open('history') },
     { label: 'Delete', icon: 'trash', destructive: true, onClick: trashCurrent },
@@ -3275,6 +3525,9 @@ el.tbHelpers.addEventListener('click', () => {
     { label: 'Syllables', icon: chk(settings.syllables), onClick: () => setSetting('syllables', !settings.syllables) },
     { label: 'Rhymes', icon: chk(settings.rhymes), onClick: () => setSetting('rhymes', !settings.rhymes) },
     { label: 'Internal rhymes', icon: chk(settings.internalRhymes), onClick: () => setSetting('internalRhymes', !settings.internalRhymes) },
+    { label: 'Rhyme rules…', icon: 'wave', onClick: () => Sheet.open('rhymes') },
+    { label: Picker.mode ? 'Exit pick mode' : 'Pick rhymes to connect', icon: Picker.mode ? 'xmark' : 'plus', onClick: () => Picker.toggleMode() },
+    ...(state.doc && state.doc.rhymesOff ? [{ label: 'Restore automatic rhymes here', icon: 'restore', onClick: () => el.manualAuto.click() }] : []),
     { label: state.editing ? 'Reading view' : 'Edit', icon: state.editing ? 'doc' : 'pencil', onClick: () => { if (state.doc) setEditing(!state.editing); } },
   ]);
 });
@@ -3287,6 +3540,685 @@ function applySidebar() {
 function toggleSidebar() { settings.sidebar = !settings.sidebar; saveSettings(); applySidebar(); }
 el.btnSidebar.addEventListener('click', toggleSidebar);
 addEventListener('resize', () => Menu.close());
+
+/* ============================================================
+   YAML (small subset: maps, flow lists, scalars) for the settings file
+   ============================================================ */
+const YAML = {
+  scalar(v) {
+    if (v === null || v === undefined) return 'null';
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    if (typeof v === 'number') return isFinite(v) ? String(v) : 'null';
+    const s = String(v);
+    if (/^[A-Za-z_Ͱ-Ͽ][A-Za-z0-9_.Ͱ-Ͽ -]*$/.test(s) && !/^(true|false|null|yes|no|on|off)$/i.test(s) && !/\s$/.test(s)) return s;
+    return JSON.stringify(s);
+  },
+  key(k) { return /^[A-Za-z_][A-Za-z0-9_-]*$/.test(k) ? k : JSON.stringify(k); },
+  stringify(obj) {
+    const out = [];
+    const emit = (val, indent, key) => {
+      const pad = ' '.repeat(indent);
+      if (Array.isArray(val)) {
+        if (!val.length) { out.push(`${pad}${key}: []`); return; }
+        if (val.every(x => !Array.isArray(x) && (typeof x !== 'object' || x === null))) { out.push(`${pad}${key}: [${val.map(x => this.scalar(x)).join(', ')}]`); return; }
+        out.push(`${pad}${key}:`);
+        for (const x of val) out.push(Array.isArray(x) ? `${pad}  - [${x.map(y => this.scalar(y)).join(', ')}]` : `${pad}  - ${this.scalar(x)}`);
+        return;
+      }
+      if (val && typeof val === 'object') {
+        const ks = Object.keys(val);
+        if (!ks.length) { out.push(`${pad}${key}: {}`); return; }
+        out.push(`${pad}${key}:`);
+        for (const k of ks) emit(val[k], indent + 2, this.key(k));
+        return;
+      }
+      out.push(`${pad}${key}: ${this.scalar(val)}`);
+    };
+    for (const k of Object.keys(obj)) emit(obj[k], 0, this.key(k));
+    return out.join('\n') + '\n';
+  },
+  splitFlow(s) {
+    const out = []; let cur = '', q = null;
+    for (const ch of s) {
+      if (q) { cur += ch; if (ch === q) q = null; continue; }
+      if (ch === '"' || ch === "'") { q = ch; cur += ch; continue; }
+      if (ch === ',') { out.push(cur); cur = ''; continue; }
+      cur += ch;
+    }
+    if (cur.trim()) out.push(cur);
+    return out;
+  },
+  parseScalar(s) {
+    s = s.trim();
+    if (s === '' || s === 'null' || s === '~') return null;
+    if (/^(true|yes|on)$/i.test(s)) return true;
+    if (/^(false|no|off)$/i.test(s)) return false;
+    if (/^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/.test(s)) return Number(s);
+    if (s[0] === '"') { try { return JSON.parse(s); } catch { return s.slice(1, -1); } }
+    if (s[0] === "'") return s.slice(1, -1).replace(/''/g, "'");
+    if (s[0] === '[' && s[s.length - 1] === ']') return this.splitFlow(s.slice(1, -1)).map(x => this.parseScalar(x));
+    if (s === '{}') return {};
+    return s;
+  },
+  unkey(k) { k = k.trim(); if (k[0] === '"') { try { return JSON.parse(k); } catch { return k.slice(1, -1); } } if (k[0] === "'") return k.slice(1, -1); return k; },
+  stripComment(line) {
+    let q = null;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) { if (ch === q) q = null; continue; }
+      if (ch === '"' || ch === "'") { q = ch; continue; }
+      if (ch === '#' && (i === 0 || /\s/.test(line[i - 1]))) return line.slice(0, i);
+    }
+    return line;
+  },
+  parse(text) {
+    const items = String(text || '').replace(/\r\n?/g, '\n').split('\n').map(l => this.stripComment(l)).filter(l => l.trim())
+      .map(l => ({ indent: l.match(/^ */)[0].length, text: l.trim() }));
+    const KEY = /^("(?:[^"\\]|\\.)*"|'[^']*'|[^:#\[\]{}][^:]*?):(?:\s+(.*))?$/;
+    let i = 0;
+    const block = indent => {
+      if (items[i] && items[i].indent === indent && (items[i].text.startsWith('- ') || items[i].text === '-')) {
+        const arr = [];
+        while (i < items.length && items[i].indent === indent && (items[i].text.startsWith('- ') || items[i].text === '-')) {
+          const rest = items[i].text.slice(1).trim(); i++;
+          if (!rest) { arr.push(i < items.length && items[i].indent > indent ? block(items[i].indent) : null); continue; }
+          arr.push(this.parseScalar(rest));
+        }
+        return arr;
+      }
+      const obj = {};
+      while (i < items.length && items[i].indent === indent && !items[i].text.startsWith('- ')) {
+        const m = items[i].text.match(KEY); i++;
+        if (!m) continue;
+        const key = this.unkey(m[1]);
+        if (m[2] !== undefined && m[2] !== '') obj[key] = this.parseScalar(m[2]);
+        else obj[key] = i < items.length && items[i].indent > indent ? block(items[i].indent) : null;
+      }
+      return obj;
+    };
+    const root = items.length ? block(items[0].indent) : {};
+    return root && typeof root === 'object' && !Array.isArray(root) ? root : {};
+  },
+};
+
+/* ============================================================
+   lyrics-settings.yaml in the open folder: written on every change, read when a folder opens
+   ============================================================ */
+/* Everything about lyrics and songs that would otherwise live only in this browser, written into the yaml
+   so a folder carries its attachments, loops, rhyme groups and take names to any device. */
+const Library = {
+  r1: v => Math.round(v * 10) / 10,
+  async snapshot() {
+    const lyrics = {};
+    if (FS.folderId) {
+      const prefix = `${FS.folderId}/`;
+      const recs = (await safe(() => DB.bindingsInRange(prefix, prefix + VFS_HI), [])) || [];
+      recs.sort((a, b) => String(a.key).localeCompare(String(b.key)));
+      for (const r of recs) {
+        const o = {};
+        if (r.beat) {
+          o.beat = r.beat.kind === 'yt' ? { kind: 'youtube', id: r.beat.id, name: r.beat.name || '' } : { kind: 'file', name: r.beat.name || '' };
+          if (r.time) o.position = this.r1(r.time);
+          if (r.loopA != null) o.loopA = this.r1(r.loopA);
+          if (r.loopB != null) o.loopB = this.r1(r.loopB);
+          if (r.loopOn === false) o.loopOn = false;
+          if (r.bpm) o.bpm = r.bpm;
+        }
+        if (Array.isArray(r.rhymes) && r.rhymes.length) {
+          o.rhymes = {};
+          for (const g of r.rhymes) { const k = `g${((g.color | 0) % 8) + 1}`; o.rhymes[k] = (o.rhymes[k] || []).concat(g.words || []); }
+        }
+        if (r.rhymesOff) o.rhymesOff = true;
+        if (Array.isArray(r.demos) && r.demos.length) o.demos = r.demos.slice();
+        if (!Object.keys(o).length) continue;
+        o.updated = new Date(r.updated || Date.now()).toISOString();
+        lyrics[String(r.key).slice(prefix.length)] = o;
+      }
+    }
+    const songs = {};
+    for (const [k, v] of Object.entries(Loops.all())) {
+      const o = {};
+      if (v.a != null) { o.loopA = this.r1(v.a); if (v.b != null) o.loopB = this.r1(v.b); if (v.on === false) o.loopOn = false; }
+      if (v.t) o.position = v.t;
+      if (Object.keys(o).length) songs[k] = o;
+    }
+    const youtube = {};
+    for (const it of Player.items) if (it.kind === 'yt') youtube[it.id] = it.name;
+    return { lyrics, songs, youtube };
+  },
+  // Bring the file's records into this browser where they are newer than (or missing from) what it has.
+  async import(parsed) {
+    let changed = false;
+    const L = parsed.lyrics;
+    if (L && typeof L === 'object' && !Array.isArray(L) && FS.folderId) {
+      for (const [rel, o] of Object.entries(L)) {
+        if (!o || typeof o !== 'object' || Array.isArray(o)) continue;
+        const key = Bindings.key(rel);
+        const cur = await safe(() => DB.getBinding(key), null);
+        const when = Date.parse(o.updated || '') || 0;
+        if (cur && (cur.updated || 0) >= when) continue;
+        const rec = { key, name: rel, updated: when || Date.now() };
+        const b = o.beat;
+        if (b && typeof b === 'object') {
+          if (b.kind === 'youtube' && /^[A-Za-z0-9_-]{11}$/.test(String(b.id || ''))) rec.beat = { kind: 'yt', id: String(b.id), name: String(b.name || 'YouTube video') };
+          else if (b.kind === 'file' && b.name) rec.beat = { kind: 'file', name: String(b.name), handle: (cur && cur.beat && cur.beat.kind !== 'yt' && cur.beat.name === String(b.name) && cur.beat.handle) || null };
+          if (rec.beat) {
+            if (typeof o.position === 'number') rec.time = o.position;
+            rec.loopA = typeof o.loopA === 'number' ? o.loopA : null;
+            rec.loopB = typeof o.loopB === 'number' ? o.loopB : null;
+            rec.loopOn = o.loopOn !== false;
+            if (typeof o.bpm === 'number') rec.bpm = o.bpm;
+          }
+        }
+        if (o.rhymes && typeof o.rhymes === 'object' && !Array.isArray(o.rhymes)) {
+          rec.rhymes = Object.entries(o.rhymes).map(([k, words]) => ({
+            color: Math.max(0, (parseInt(String(k).replace(/\D/g, ''), 10) || 1) - 1) % 8,
+            words: (Array.isArray(words) ? words : [words]).map(String).filter(Boolean),
+          })).filter(g => g.words.length);
+          if (!rec.rhymes.length) delete rec.rhymes;
+        }
+        if (o.rhymesOff === true) rec.rhymesOff = true;
+        if (Array.isArray(o.demos) && o.demos.length) rec.demos = o.demos.map(String);
+        await safe(() => DB.putBinding(rec));
+        Bindings.cache.delete(key);
+        changed = true;
+      }
+    }
+    const S = parsed.songs;
+    if (S && typeof S === 'object' && !Array.isArray(S)) {
+      const all = Loops.all(); let touched = false;
+      for (const [k, o] of Object.entries(S)) {
+        if (!o || typeof o !== 'object' || all[k]) continue;
+        const rec = { u: 0 };
+        if (typeof o.loopA === 'number') { rec.a = o.loopA; rec.b = typeof o.loopB === 'number' ? o.loopB : null; rec.on = o.loopOn !== false; }
+        if (typeof o.position === 'number') rec.t = o.position;
+        all[k] = rec; touched = true;
+      }
+      if (touched) LS.set('lyr:loops', all);
+    }
+    const Y = parsed.youtube;
+    if (Y && typeof Y === 'object' && !Array.isArray(Y)) {
+      let added = false;
+      for (const [id, name] of Object.entries(Y)) {
+        if (!/^[A-Za-z0-9_-]{11}$/.test(id) || Player.items.some(x => x.kind === 'yt' && x.id === id)) continue;
+        Player.items.push({ kind: 'yt', id, name: String(name || 'YouTube video'), file: null, handle: null }); added = true;
+      }
+      if (added) { LS.set('lyr:yt', Player.items.filter(x => x.kind === 'yt').map(x => ({ id: x.id, name: x.name }))); Player.render(); }
+    }
+    return changed;
+  },
+};
+
+const SettingsFile = {
+  name: 'lyrics-settings.yaml', timer: null, writing: false, lastBody: null, lastWrite: 0,
+  keys() { return Object.keys(DEFAULTS); },
+  snapshot() { const o = {}; for (const k of this.keys()) o[k] = settings[k] === undefined ? DEFAULTS[k] : settings[k]; return o; },
+  async body() {
+    const lib = await Library.snapshot();
+    return YAML.stringify(Object.assign(this.snapshot(), { lyrics: lib.lyrics, songs: lib.songs, youtube: lib.youtube }));
+  },
+  async handle(create) { if (!FS.handle) return null; try { return await FS.handle.getFileHandle(this.name, { create: !!create }); } catch { return null; } },
+  schedule() {
+    if (!FS.handle) return;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.write(), Math.max(800, 3000 - (Date.now() - this.lastWrite)));
+  },
+  async write() {
+    clearTimeout(this.timer); this.timer = null;
+    if (!FS.handle) return;
+    if (this.writing) { this.schedule(); return; }
+    this.writing = true;
+    try {
+      const body = await this.body();
+      if (body !== this.lastBody) {
+        const h = await this.handle(true);
+        if (h) {
+          await FS.write(h, '# Lyrics settings and library · written by the app, safe to edit by hand\n' + body, { bom: false, eol: '\n' });
+          this.lastBody = body; this.lastWrite = Date.now();
+        }
+      }
+    } catch (e) { console.warn('Settings file not written', e); }
+    this.writing = false;
+  },
+  // Apply the folder's file over the current settings and merge its library. Missing file: create it.
+  async load() {
+    if (!FS.handle) return false;
+    this.lastBody = null;
+    const h = await this.handle(false);
+    if (!h) { await this.write(); return false; }
+    let parsed;
+    try { parsed = YAML.parse((await FS.read(h)).text); } catch (e) { console.warn('Settings file unreadable', e); return false; }
+    await Library.import(parsed);
+    let changed = false, complete = true;
+    for (const k of this.keys()) {
+      if (!(k in parsed)) { complete = false; continue; }
+      const v = parsed[k], d = DEFAULTS[k];
+      let val;
+      if (k === 'customTheme') { if (v !== null && (typeof v !== 'object' || Array.isArray(v))) continue; val = v; }
+      else if (Array.isArray(d)) { if (!Array.isArray(v)) continue; val = v.map(x => Array.isArray(x) ? x.map(String) : String(x)); }
+      else if (typeof d === 'number') { if (typeof v !== 'number' || !isFinite(v)) continue; val = v; }
+      else if (typeof d === 'boolean') { if (typeof v !== 'boolean') continue; val = v; }
+      else { if (typeof v !== 'string' && v !== null) continue; val = v === null ? d : v; }
+      if (JSON.stringify(settings[k]) !== JSON.stringify(val)) { settings[k] = val; changed = true; }
+    }
+    if (complete) this.lastBody = await this.body();
+    if (changed) { LS.set('lyr:settings', settings); applyAllSettings(); }
+    if (!complete) this.schedule();
+    return changed;
+  },
+};
+function applyAllSettings() {
+  Rules.cache = null;
+  applyTheme(); applyInitialSettings(); Visuals.applyEnabled(); syncSettingsUI();
+  AutoScroll.render(); Player.render();
+  queueRender(); if (state.doc && !state.editing) renderReader();
+  sortFiles(); renderList();
+}
+
+/* ============================================================
+   Demos: record takes with the microphone, several per lyric, kept in a Demos folder next to it
+   ============================================================ */
+const fmtSize = b => b < 1e6 ? `${Math.max(1, Math.round(b / 1e3))} KB` : `${(b / 1e6).toFixed(1)} MB`;
+const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}`; };
+const Demos = {
+  rec: null, chunks: [], stream: null, startAt: 0, timer: null, mime: '', ext: 'webm', doc: null,
+  list: [], playing: null, url: null, meter: null, meterRaf: 0,
+  supported() { return !!(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); },
+  pickType() {
+    const cands = [['audio/mp4', 'm4a'], ['audio/webm;codecs=opus', 'webm'], ['audio/webm', 'webm'], ['audio/ogg;codecs=opus', 'ogg']];
+    for (const [m, ext] of cands) { try { if (MediaRecorder.isTypeSupported(m)) return { mime: m, ext }; } catch { /* ignore */ } }
+    return { mime: '', ext: 'webm' };
+  },
+  // All takes live in one demos/ folder at the root of the chosen folder (or of the on-device store).
+  // A take is tied to its lyric by name prefix: "<folder - path - stem> - demo <timestamp>.<ext>".
+  prefixFor(rel) { return `${String(rel).replace(/\.txt$/i, '').split('/').join(' - ')} - demo `; },
+  prefix(doc) { return this.prefixFor(doc.rel); },
+  async dir(doc, create) { try { return FS.handle ? await FS.handle.getDirectoryHandle('demos', { create: !!create }) : null; } catch { return null; } },
+  async namesFor(rel) {
+    const dir = await this.dir(null, false); if (!dir) return [];
+    const p = this.prefixFor(rel), out = [];
+    try { for await (const e of dir.values()) if (e.kind === 'file' && e.name.startsWith(p)) out.push(e.name); } catch { /* ignore */ }
+    return out.sort();
+  },
+  // Keep the lyric's record (and so the yaml file) listing its takes by name.
+  async syncNames(doc) {
+    if (!doc || !FS.folderId) return;
+    const names = await this.namesFor(doc.rel);
+    const rec = Object.assign({}, (await Bindings.get(doc.rel)) || {});
+    const cur = Array.isArray(rec.demos) ? rec.demos : [];
+    if (JSON.stringify(cur) === JSON.stringify(names)) return;
+    if (names.length) rec.demos = names; else delete rec.demos;
+    await Bindings.putOrRemove(doc.rel, rec);
+  },
+  async refresh() {
+    const d = state.doc; this.list = [];
+    if (d) {
+      const dir = await this.dir(d, false);
+      if (dir) {
+        const p = this.prefix(d);
+        try {
+          for await (const e of dir.values()) {
+            if (e.kind !== 'file' || !e.name.startsWith(p)) continue;
+            let f; try { f = await e.getFile(); } catch { continue; }
+            this.list.push({ name: e.name, handle: e, dir, modified: f.lastModified, size: f.size });
+          }
+        } catch (e) { console.warn(e); }
+        this.list.sort((a, b) => b.modified - a.modified);
+      }
+      this.syncNames(d).catch(e => console.warn(e));
+    }
+    this.render();
+  },
+  render() {
+    const d = state.doc, ok = this.supported();
+    el.demoTitle.textContent = d ? `Demos · ${stem(d.name)}` : 'Demos';
+    el.btnDemos.classList.toggle('rec', !!this.rec);
+    el.recBtn.classList.toggle('on', !!this.rec);
+    el.recBtn.setAttribute('aria-label', this.rec ? 'Stop recording' : 'Start recording');
+    el.recBtn.disabled = !ok || (!d && !this.rec);
+    el.recHint.textContent = !ok ? 'Recording is not available in this browser' : this.rec ? `Recording “${stem(this.doc.name)}” · tap to stop` : !d ? 'Open a lyric to record a take' : 'Tap to record a take';
+    const p = d ? this.prefix(d) : '';
+    el.demoList.innerHTML = this.list.map((x, i) => {
+      const label = x.name.slice(p.length).replace(/\.[^.]+$/, '');
+      const playingThis = this.playing === x.name && !el.demoAudio.paused;
+      return `<li class="cell demo-cell" data-i="${i}"><button class="icon-btn" data-play="${i}" aria-label="${playingThis ? 'Pause' : 'Play'}">${playingThis ? ICONS.pause : ICONS.play}</button><div class="txt"><div class="ttl">${esc(label)}</div><div class="sub"><b>${esc(fmtDate(x.modified))}</b>${esc(fmtSize(x.size))} · ${esc(x.name.split('.').pop().toUpperCase())}</div></div><button class="icon-btn cell-more" data-demo-more="${i}" aria-label="Take options">${ICONS.more}</button></li>`;
+    }).join('');
+    el.demoEmpty.hidden = this.list.length > 0 || !d;
+    const t = this.pickType();
+    el.demoNote.textContent = ok ? `Takes are saved in the folder’s “demos” folder as .${t.ext} files (${t.ext === 'm4a' ? 'AAC' : 'Opus'}), the format this browser records natively, and listed in lyrics-settings.yaml. Play the beat while recording to capture it too.` : '';
+  },
+  async toggle() { if (this.rec) this.stop(); else await this.start(); },
+  async start() {
+    const d = state.doc; if (!d || this.rec) return;
+    if (!this.supported()) { toast('Recording is not available in this browser'); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } }); }
+    catch (e) { console.warn(e); toast(e && e.name === 'NotAllowedError' ? 'Microphone access was not allowed' : 'No microphone is available', 3200); return; }
+    const t = this.pickType(); this.mime = t.mime; this.ext = t.ext;
+    let rec;
+    try { rec = new MediaRecorder(stream, t.mime ? { mimeType: t.mime, audioBitsPerSecond: 96000 } : undefined); }
+    catch (e) { console.warn(e); stream.getTracks().forEach(x => x.stop()); toast('Could not start the recorder'); return; }
+    this.stream = stream; this.rec = rec; this.chunks = []; this.startAt = Date.now(); this.doc = d;
+    rec.addEventListener('dataavailable', e => { if (e.data && e.data.size) this.chunks.push(e.data); });
+    rec.addEventListener('stop', () => this.finish());
+    rec.addEventListener('error', e => { console.warn(e); toast('Recording error'); });
+    rec.start(1000);
+    this.timer = setInterval(() => { el.recTime.textContent = fmtTime((Date.now() - this.startAt) / 1000); }, 250);
+    this.startMeter(stream);
+    this.render();
+  },
+  stop() { if (!this.rec) return; try { this.rec.stop(); } catch (e) { console.warn(e); this.finish(); } },
+  async finish() {
+    clearInterval(this.timer); this.timer = null; this.stopMeter();
+    const rec = this.rec, doc = this.doc, chunks = this.chunks, mime = (rec && rec.mimeType) || this.mime, seconds = (Date.now() - this.startAt) / 1000;
+    this.rec = null; this.chunks = [];
+    if (this.stream) { this.stream.getTracks().forEach(x => x.stop()); this.stream = null; }
+    el.recTime.textContent = '0:00'; el.recLevel.style.width = '0';
+    this.render();
+    if (!chunks.length || !doc) { toast('Nothing was recorded'); return; }
+    const blob = new Blob(chunks, { type: mime || 'application/octet-stream' });
+    const fileName = `${this.prefix(doc)}${stamp()}.${this.ext}`;
+    try {
+      const dir = await this.dir(doc, true);
+      const name = await FS.uniqueName(dir, fileName);
+      const h = await dir.getFileHandle(name, { create: true });
+      const w = await h.createWritable();
+      try { await w.write(await blob.arrayBuffer()); await w.close(); } catch (e) { try { await w.abort(); } catch { /* ignore */ } throw e; }
+      toast(`Take saved · ${fmtTime(seconds)}`, 2000);
+      await this.syncNames(doc);
+      if (state.doc && state.doc.rel === doc.rel) await this.refresh();
+    } catch (e) { console.warn(e); this.download(blob, fileName); toast('The take could not be saved in the folder, so it was downloaded instead', 4200); }
+  },
+  download(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = name; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  },
+  startMeter(stream) {
+    try {
+      const ctx = Sound.ensure(), src = ctx.createMediaStreamSource(stream), an = ctx.createAnalyser();
+      an.fftSize = 512; src.connect(an);
+      const buf = new Uint8Array(an.frequencyBinCount);
+      this.meter = { src, an };
+      const loop = () => {
+        if (!this.meter) return;
+        an.getByteTimeDomainData(buf);
+        let peak = 0; for (let i = 0; i < buf.length; i++) { const v = Math.abs(buf[i] - 128) / 128; if (v > peak) peak = v; }
+        el.recLevel.style.width = `${Math.min(100, Math.round(peak * 140))}%`;
+        this.meterRaf = requestAnimationFrame(loop);
+      };
+      loop();
+    } catch (e) { console.warn(e); }
+  },
+  stopMeter() { cancelAnimationFrame(this.meterRaf); if (this.meter) { try { this.meter.src.disconnect(); } catch { /* ignore */ } this.meter = null; } },
+  async play(i) {
+    const x = this.list[i]; if (!x) return;
+    if (this.playing === x.name) { if (el.demoAudio.paused) el.demoAudio.play().catch(() => {}); else el.demoAudio.pause(); return; }
+    Player.pauseAll();
+    if (this.url) URL.revokeObjectURL(this.url);
+    try { this.url = URL.createObjectURL(await x.handle.getFile()); } catch (e) { console.warn(e); toast('Could not open that take'); return; }
+    this.playing = x.name; el.demoAudio.src = this.url;
+    el.demoAudio.play().catch(() => toast('This take cannot be played in this browser'));
+    this.render();
+  },
+  menu(anchor, i) {
+    const x = this.list[i]; if (!x) return;
+    Menu.open(anchor, [
+      { label: 'Rename', icon: 'pencil', onClick: () => this.rename(i) },
+      { label: 'Download', icon: 'doc', onClick: async () => { try { this.download(await x.handle.getFile(), x.name); } catch { toast('Could not read that take'); } } },
+      { label: 'Delete', icon: 'trash', destructive: true, onClick: () => this.remove(i) },
+    ]);
+  },
+  async rename(i) {
+    const x = this.list[i], d = state.doc; if (!x || !d) return;
+    const p = this.prefix(d), ext = x.name.slice(x.name.lastIndexOf('.'));
+    const v = await alertPrompt({ title: 'Rename Take', value: x.name.slice(p.length, x.name.length - ext.length), ok: 'Rename' });
+    if (v == null) return;
+    const label = v.trim().replace(/[<>:"/\\|?*]/g, '').replace(/[. ]+$/, '');
+    if (!label) { toast('That name can’t be used'); return; }
+    const name = `${p}${label}${ext}`;
+    if (name === x.name) return;
+    try {
+      if (await FS.exists(x.dir, name)) { toast('A take with that name already exists'); return; }
+      await FS.move(x.dir, x.handle, x.dir, name);
+      if (this.playing === x.name) this.playing = name;
+      await this.refresh();
+    } catch (e) { handleFsError(e); }
+  },
+  async remove(i) {
+    const x = this.list[i]; if (!x) return;
+    const c = await actionSheet({ title: 'Delete this take?', message: 'It moves to Recently Deleted (Trash › demos).', actions: [{ label: 'Delete', destructive: true }] });
+    if (c !== 0) return;
+    try {
+      const tdir = await (await FS.getTrash()).getDirectoryHandle('demos', { create: true });
+      await FS.move(x.dir, x.handle, tdir, await FS.uniqueName(tdir, x.name));
+      if (this.playing === x.name) { el.demoAudio.pause(); this.playing = null; }
+      await this.refresh(); toast('Take moved to Recently Deleted', 1600);
+    } catch (e) { handleFsError(e); }
+  },
+  // Takes follow their lyric: their name prefix changes when the lyric is renamed, moved, trashed or restored.
+  async renamePrefix(oldPrefix, newPrefix, folderMode) {
+    if (oldPrefix === newPrefix) return 0;
+    const dir = await this.dir(null, false); if (!dir) return 0;
+    const entries = [];
+    for await (const e of dir.values()) {
+      if (e.kind !== 'file' || !e.name.startsWith(oldPrefix)) continue;
+      if (folderMode && e.name.slice(oldPrefix.length).startsWith('demo ')) continue;   // a root lyric named like the folder
+      entries.push(e);
+    }
+    for (const e of entries) await FS.move(dir, e, dir, await FS.uniqueName(dir, newPrefix + e.name.slice(oldPrefix.length)));
+    return entries.length;
+  },
+  rekey(oldRel, newRel) { return this.renamePrefix(this.prefixFor(oldRel), this.prefixFor(newRel), false); },
+  rekeyFolder(oldPath, newPath) { return this.renamePrefix(`${oldPath.join(' - ')} - `, `${newPath.join(' - ')} - `, true); },
+  // Permanent deletion of a lyric parks its takes in Trash/demos until Recently Deleted is emptied.
+  async toTrash(rel) {
+    const dir = await this.dir(null, false); if (!dir) return;
+    const p = this.prefixFor(rel), entries = [];
+    for await (const e of dir.values()) if (e.kind === 'file' && e.name.startsWith(p)) entries.push(e);
+    if (!entries.length) return;
+    const tdir = await (await FS.getTrash()).getDirectoryHandle('demos', { create: true });
+    for (const e of entries) await FS.move(dir, e, tdir, await FS.uniqueName(tdir, e.name));
+  },
+};
+el.recBtn.addEventListener('click', () => Demos.toggle());
+el.btnDemos.addEventListener('click', () => Sheet.open('demos'));
+el.demoList.addEventListener('click', e => {
+  const more = e.target.closest('[data-demo-more]'); if (more) { Demos.menu(more, +more.dataset.demoMore); return; }
+  const play = e.target.closest('[data-play]'); if (play) Demos.play(+play.dataset.play);
+});
+['play', 'pause', 'ended'].forEach(ev => el.demoAudio.addEventListener(ev, () => Demos.render()));
+addEventListener('beforeunload', () => { if (Demos.rec) Demos.stop(); });
+
+/* ============================================================
+   Rhyme rules editor and quick actions from reading view
+   ============================================================ */
+const RulesUI = {
+  parseSets: text => text.split('\n').map(l => l.split(/[=,]/).map(s => s.trim()).filter(Boolean)).filter(a => a.length >= 2),
+  parseGroups: text => text.split('\n').map(l => l.split(',').map(s => s.trim()).filter(Boolean)).filter(a => a.length >= 2),
+  parseIgnore: text => text.split(/[,\n]/).map(s => s.trim()).filter(Boolean),
+  fill() {
+    el.rulesEquiv.value = (settings.rhymeEquiv || []).map(a => a.join(' = ')).join('\n');
+    el.rulesGroups.value = (settings.rhymeGroups || []).map(a => a.join(', ')).join('\n');
+    el.rulesIgnore.value = (settings.rhymeIgnore || []).join(', ');
+    this.status(); renderManualGroups();
+  },
+  status() { el.rulesStatus.textContent = `${plural((settings.rhymeEquiv || []).length, 'ending set')} · ${plural((settings.rhymeGroups || []).length, 'word group')} · ${plural((settings.rhymeIgnore || []).length, 'ignored word')}`; },
+  apply() {
+    settings.rhymeEquiv = this.parseSets(el.rulesEquiv.value);
+    settings.rhymeGroups = this.parseGroups(el.rulesGroups.value);
+    settings.rhymeIgnore = this.parseIgnore(el.rulesIgnore.value);
+    this.commit();
+  },
+  commit() { saveSettings(); Rules.cache = null; this.status(); queueRender(); if (state.doc && !state.editing) renderReader(); },
+  addGroup(words) {
+    const g = words.map(s => s.trim()).filter(Boolean);
+    if (g.length < 2) { toast('Type at least one other word', 1600); return; }
+    settings.rhymeGroups = (settings.rhymeGroups || []).concat([g]); this.commit();
+    toast(`${g.join(', ')} now rhyme together`, 2200);
+  },
+  ignore(word) {
+    const w = cleanWord(word); if (!w) return;
+    settings.rhymeIgnore = (settings.rhymeIgnore || []).concat([w]); this.commit();
+    toast(`“${word}” is no longer highlighted`, 1800);
+  },
+};
+let rulesTimer = null;
+[el.rulesEquiv, el.rulesGroups, el.rulesIgnore].forEach(t => t.addEventListener('input', () => { clearTimeout(rulesTimer); rulesTimer = setTimeout(() => RulesUI.apply(), 400); }));
+el.setRhymeRules.addEventListener('click', () => Sheet.open('rhymes'));
+el.reader.addEventListener('click', e => {
+  const w = e.target.closest('.w');
+  if (w && (e.ctrlKey || e.metaKey || Picker.mode)) { e.preventDefault(); Picker.toggle(w.textContent); return; }
+  const s = e.target.closest('.rh'); if (!s) return;
+  const word = s.dataset.w || s.textContent, key = rhymeKey(word.split(/\s+/).pop());
+  Menu.open(s, [
+    { label: `“${word}” · sounds like “${key || '?'}”`, icon: 'wave', onClick: () => Sheet.open('rhymes') },
+    { label: 'Pick to connect…', icon: 'plus', onClick: () => Picker.toggle(word) },
+    { label: 'Rhyme with another word (everywhere)…', icon: 'wave', onClick: async () => {
+      const v = await alertPrompt({ title: 'Rhymes with', message: `Words that should rhyme with “${word}” in every lyric, separated by commas.`, placeholder: 'word, word', ok: 'Add' });
+      if (v) RulesUI.addGroup([word].concat(v.split(',')));
+    } },
+    { label: `Never highlight “${word}”`, icon: 'xmark', onClick: () => RulesUI.ignore(word) },
+    { label: 'Rhyme rules…', icon: 'gear', onClick: () => Sheet.open('rhymes') },
+  ]);
+});
+
+/* ============================================================
+   Rhyme picker: Ctrl+click (or Pick mode) collects words; a color connects them as a group saved with the lyric
+   ============================================================ */
+const solidTint = t => t.replace(/,\s*[\d.]+\)$/, ', 1)');
+function buildPickSwatches() {
+  el.pickColors.innerHTML = TINTS.map((t, i) => `<button class="pick-swatch" data-c="${i}" style="--tint:${solidTint(t)}" aria-label="Connect as group ${i + 1}" title="Group ${i + 1}"></button>`).join('');
+  Picker.render();
+}
+function wordAt(text, pos) {
+  const start = text.lastIndexOf('\n', pos - 1) + 1, nl = text.indexOf('\n', pos), end = nl === -1 ? text.length : nl;
+  const line = text.slice(start, end), p = pos - start;
+  for (const t of line.matchAll(WORD_RE)) { if (p >= t.index && p <= t.index + t[0].length) return t[0]; }
+  return null;
+}
+function rerenderRhymes() { queueRender(); if (state.doc && !state.editing) renderReader(); }
+const Manual = {
+  async load(rel) {
+    const rec = await Bindings.get(rel);
+    const groups = rec && Array.isArray(rec.rhymes)
+      ? rec.rhymes.filter(g => g && Array.isArray(g.words) && g.words.length).map(g => ({ color: Number.isInteger(g.color) ? g.color : 0, words: g.words.map(String) }))
+      : [];
+    return { groups, off: !!(rec && rec.rhymesOff) };
+  },
+  async save(d) {
+    const rec = Object.assign({}, (await Bindings.get(d.rel)) || {});
+    if (d.rhymes && d.rhymes.length) rec.rhymes = d.rhymes; else delete rec.rhymes;
+    if (d.rhymesOff) rec.rhymesOff = true; else delete rec.rhymesOff;
+    await Bindings.putOrRemove(d.rel, rec);
+    renderManualGroups();
+  },
+};
+const Picker = {
+  mode: false, lastPick: 0, lastKey: '',
+  norm(p) { return String(p).split(/\s+/).map(cleanWord).filter(Boolean).join(' '); },
+  toggleMode(on) {
+    this.mode = on == null ? !this.mode : !!on;
+    el.pickMode.setAttribute('aria-pressed', String(this.mode));
+    el.app.classList.toggle('picking', this.mode);
+    this.render();
+    if (this.mode) toast(state.editing ? 'Pick mode: click words to pick them (reading view is easiest on touch)' : 'Pick mode: tap words to pick them', 2200);
+  },
+  toggle(phrase) {
+    const key = this.norm(phrase); if (!key || !state.doc) return;
+    const now = Date.now();
+    if (key === this.lastKey && now - this.lastPick < 450) return;   // a double-click is one pick
+    this.lastPick = now; this.lastKey = key;
+    const i = state.picks.findIndex(p => this.norm(p) === key);
+    if (i >= 0) state.picks.splice(i, 1); else state.picks.push(String(phrase).trim());
+    this.render(); rerenderRhymes();
+  },
+  clearPicks() { state.picks = []; this.render(); rerenderRhymes(); },
+  // Clear = a blank slate for this lyric: picks, connected groups, and the automatic tints (until restored in Rhyme Rules).
+  async clear() {
+    const d = state.doc; if (!d) return;
+    const groups = (d.rhymes || []).length;
+    if (groups) {
+      const i = await actionSheet({ title: 'Clear all highlights?', message: `Removes ${plural(groups, 'connected group')} and hides automatic rhymes in this lyric.`, actions: [{ label: 'Clear Everything', destructive: true }, { label: 'Clear Picks Only' }] });
+      if (i === null) return;
+      if (i === 1) { this.clearPicks(); return; }
+    }
+    state.picks = []; d.rhymes = []; d.rhymesOff = true;
+    await Manual.save(d); this.render(); rerenderRhymes();
+    toast('No highlights in this lyric now · restore them in Rhyme Rules', 3200);
+  },
+  // From the editor: the selection if there is one (one pick per line), otherwise the word under the caret.
+  pickFromTextarea() {
+    if (!state.doc) return;
+    const text = el.ta.value, a = el.ta.selectionStart, b = el.ta.selectionEnd;
+    if (a === b) { const w = wordAt(text, a); if (w) this.toggle(w); return; }
+    const start = text.lastIndexOf('\n', a - 1) + 1, nl = text.indexOf('\n', b), end = nl === -1 ? text.length : nl;
+    let off = start;
+    for (const line of text.slice(start, end).split('\n')) {
+      const lo = Math.max(a, off) - off, hi = Math.min(b, off + line.length) - off;
+      if (hi > lo) {
+        const toks = Array.from(line.matchAll(WORD_RE)).filter(t => t.index + t[0].length > lo && t.index < hi);
+        if (toks.length) { const first = toks[0], last = toks[toks.length - 1]; this.lastKey = ''; this.toggle(line.slice(first.index, last.index + last[0].length)); }
+      }
+      off += line.length + 1;
+    }
+  },
+  assign(color) {
+    const d = state.doc; if (!d || !state.picks.length) return;
+    const groups = d.rhymes || [], keys = state.picks.map(p => this.norm(p));
+    for (const g of groups) g.words = (g.words || []).filter(w => !keys.includes(this.norm(w)));   // a word lives in one group
+    let g = groups.find(x => x.color === color);
+    if (!g) { g = { color, words: [] }; groups.push(g); }
+    g.words = g.words.concat(state.picks.map(p => p.trim()));
+    d.rhymes = groups.filter(x => x.words.length);
+    const n = g.words.length; state.picks = [];
+    Manual.save(d); this.render(); rerenderRhymes();
+    toast(`Group ${color + 1} · ${plural(n, 'word')}`, 1500);
+  },
+  ungroup() {
+    const d = state.doc; if (!d || !state.picks.length) return;
+    const keys = state.picks.map(p => this.norm(p));
+    for (const g of d.rhymes || []) g.words = g.words.filter(w => !keys.includes(this.norm(w)));
+    d.rhymes = (d.rhymes || []).filter(g => g.words.length);
+    state.picks = [];
+    Manual.save(d); this.render(); rerenderRhymes();
+    toast('Removed from their groups', 1400);
+  },
+  render() {
+    const n = state.picks.length;
+    el.pickbar.hidden = !state.doc || !(n || this.mode);
+    el.pickWords.textContent = n ? state.picks.join(' · ') : (this.mode ? 'Tap words to pick them' : 'Ctrl+click words to pick them');
+    el.pickUngroup.hidden = !n;
+    el.pickClear.hidden = false;
+    $$('.pick-swatch', el.pickColors).forEach(b => { b.disabled = !n; });
+  },
+};
+function renderManualGroups() {
+  const groups = (state.doc && state.doc.rhymes) || [];
+  el.manualList.innerHTML = groups.map((g, i) => `<li class="cell"><span class="dot" style="--tint:${solidTint(TINTS[g.color % 8])}"></span><div class="txt"><div class="ttl">${esc(g.words.join(', '))}</div><div class="sub">Group ${g.color + 1}</div></div><button class="icon-btn cell-more" data-manual-rm="${i}" aria-label="Remove group">${ICONS.xmark}</button></li>`).join('');
+  el.manualEmpty.hidden = groups.length > 0;
+  el.manualAuto.setAttribute('aria-checked', String(!!state.doc && !state.doc.rhymesOff));
+  el.manualAuto.disabled = !state.doc;
+}
+el.manualAuto.addEventListener('click', async () => {
+  const d = state.doc; if (!d) return;
+  d.rhymesOff = !d.rhymesOff;
+  await Manual.save(d); rerenderRhymes();
+  toast(d.rhymesOff ? 'Automatic rhymes hidden in this lyric' : 'Automatic rhymes restored', 1600);
+});
+el.pickColors.addEventListener('click', e => { const b = e.target.closest('.pick-swatch'); if (b && !b.disabled) Picker.assign(+b.dataset.c); });
+el.pickUngroup.addEventListener('click', () => Picker.ungroup());
+el.pickClear.addEventListener('click', () => Picker.clear());
+el.pickMode.addEventListener('click', () => Picker.toggleMode());
+el.manualPickMode.addEventListener('click', () => { Sheet.close(); Picker.toggleMode(true); });
+el.manualList.addEventListener('click', async e => {
+  const b = e.target.closest('[data-manual-rm]'); if (!b || !state.doc) return;
+  state.doc.rhymes.splice(+b.dataset.manualRm, 1);
+  await Manual.save(state.doc); rerenderRhymes();
+});
+el.ta.addEventListener('mouseup', e => { if (e.ctrlKey || e.metaKey || Picker.mode) setTimeout(() => Picker.pickFromTextarea(), 0); });
+el.ta.addEventListener('touchend', () => { if (Picker.mode) setTimeout(() => Picker.pickFromTextarea(), 60); }, { passive: true });
 
 /* ============================================================
    Mouse wheel adjusts every numeric control
@@ -3352,7 +4284,10 @@ addEventListener('keydown', e => {
   if (e.defaultPrevented) return;
   const mod = e.ctrlKey || e.metaKey;
   const tag = e.target && e.target.tagName;
-  if (e.key === 'Escape') { Sheet.close(); Menu.close(); return; }
+  if (e.key === 'Escape') {
+    if (!Sheet.current && !el.menu.classList.contains('show')) { if (Picker.mode) Picker.toggleMode(false); else if (state.picks.length) Picker.clearPicks(); }
+    Sheet.close(); Menu.close(); return;
+  }
   if (mod && !e.altKey && !e.shiftKey) {
     switch (e.code) {
       case 'Space': e.preventDefault(); Player.toggle(); break;
