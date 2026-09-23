@@ -422,16 +422,52 @@
   /* ===== Graffiti style: block-letter titles, sticker cards with hard shadows, marker labels, spray haze.
      Same layout and color themes as the iPhone style; every rule below only adds on top. ===== */
   html[data-style="graffiti"] {
-    --font-display: Impact, "Arial Black", "Futura-CondensedExtraBold", "Franklin Gothic Heavy", "Segoe UI Black", system-ui, sans-serif;
+    --font-display: Impact, "Arial Black", "AvenirNextCondensed-Heavy", "HelveticaNeue-CondensedBlack", "Futura-CondensedExtraBold", "Franklin Gothic Heavy", "Segoe UI Black", system-ui, sans-serif;
     --font-tag: "Marker Felt", "Segoe Print", "Bradley Hand", "Chalkboard SE", "Comic Sans MS", cursive;
     --radius: 14px 6px 12px 8px;
     --ink: var(--label);
     --sticker: 3px 3px 0 var(--ink);
   }
+  /* Ink is the text color pulled a step toward the background: paper-white, never blinding. */
+  @supports (color: color-mix(in srgb, red, blue)) {
+    html[data-style="graffiti"] { --ink: color-mix(in srgb, var(--label) 82%, var(--bg)); }
+  }
+  html[data-style="graffiti"] body, html[data-style="graffiti"] .reader, html[data-style="graffiti"] .cell .ttl, html[data-style="graffiti"] .row .lbl { color: var(--ink); }
+  html[data-style="graffiti"] .ta { color: var(--ink); -webkit-text-fill-color: var(--ink); }
+  html[data-style="graffiti"] .cell.active, html[data-style="graffiti"] .cell.active .ttl { color: var(--on-accent); }
+  /* Wall: a faint block grid like painted brick, plus two spray clouds in the accent colors. */
   html[data-style="graffiti"] body::before {
     content: ""; position: fixed; inset: 0; z-index: 1; pointer-events: none;
-    background: radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), .18), transparent 34%), radial-gradient(circle at 88% 84%, rgba(var(--accent2-rgb), .16), transparent 38%);
+    background:
+      radial-gradient(circle at 12% 18%, rgba(var(--accent-rgb), .16), transparent 34%),
+      radial-gradient(circle at 88% 84%, rgba(var(--accent2-rgb), .14), transparent 38%),
+      repeating-linear-gradient(0deg, rgba(var(--accent-rgb), .045) 0 1px, transparent 1px 30px),
+      repeating-linear-gradient(90deg, rgba(var(--accent-rgb), .035) 0 1px, transparent 1px 72px);
   }
+  /* Paint drips under the sidebar title */
+  html[data-style="graffiti"] .large-title { position: relative; display: inline-block; max-width: 100%; }
+  html[data-style="graffiti"] .large-title::after {
+    content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 20px; pointer-events: none;
+    background:
+      linear-gradient(var(--accent), var(--accent)) 8% 0 / 3px 11px no-repeat,
+      radial-gradient(circle, var(--accent) 58%, transparent 64%) calc(8% - 1.5px) 9px / 6px 6px no-repeat,
+      linear-gradient(var(--accent), var(--accent)) 41% 0 / 3px 17px no-repeat,
+      radial-gradient(circle, var(--accent) 58%, transparent 64%) calc(41% - 1.5px) 15px / 6px 6px no-repeat,
+      linear-gradient(var(--accent), var(--accent)) 73% 0 / 3px 8px no-repeat,
+      radial-gradient(circle, var(--accent) 58%, transparent 64%) calc(73% - 1.5px) 6px / 6px 6px no-repeat;
+  }
+  html[data-style="graffiti"] .side-head { padding-bottom: 14px; }
+  /* Empty state reads like a tag on the wall */
+  html[data-style="graffiti"] .empty p {
+    font-family: var(--font-display); text-transform: uppercase; font-size: clamp(30px, 5vw, 54px); line-height: 1; letter-spacing: .02em; max-width: 11ch; margin: 0 auto;
+    color: transparent; -webkit-text-stroke: 2px rgba(var(--accent-rgb), .6); text-shadow: 5px 5px 0 rgba(var(--accent2-rgb), .35); transform: rotate(-4deg) skewX(-6deg);
+  }
+  html[data-style="graffiti"] .empty .ico { display: none; }
+  /* Selected rows look hand-cut */
+  html[data-style="graffiti"] .cell.active { clip-path: polygon(0 1.5%, 100% 0, 99.3% 100%, .7% 97%); }
+  /* Hazard-tape stripe along the toolbar */
+  html[data-style="graffiti"] .toolbar { border-top: 4px solid; border-image: repeating-linear-gradient(135deg, rgba(var(--accent-rgb), .85) 0 14px, rgba(var(--accent2-rgb), .85) 14px 28px) 4; }
+  html[data-style="graffiti"] .btn:hover, html[data-style="graffiti"] .small-btn:not([aria-pressed="true"]):hover { transform: rotate(-1.2deg); }
   html[data-style="graffiti"] .sidebar { border-right: 3px solid var(--ink); }
   html[data-style="graffiti"] .large-title, html[data-style="graffiti"] .card h1, html[data-style="graffiti"] .sheet-head h2, html[data-style="graffiti"] .now-title, html[data-style="graffiti"] .rec-time {
     font-family: var(--font-display); font-weight: 900; text-transform: uppercase; letter-spacing: .01em; transform: skewX(-6deg);
@@ -473,7 +509,6 @@
   html[data-style="graffiti"] .stepper .val { font-family: var(--font-display); }
   html[data-style="graffiti"] .nav, html[data-style="graffiti"] .toolbar { background: rgba(var(--bg-rgb), .94); -webkit-backdrop-filter: none; backdrop-filter: none; }
   html[data-style="graffiti"] .nav { border-bottom: 3px solid var(--ink); }
-  html[data-style="graffiti"] .toolbar { border-top: 3px solid var(--ink); }
   html[data-style="graffiti"] .wavebar { border-top: 2px dashed var(--separator); }
   html[data-style="graffiti"] .wave-vol { border-left: 2px dashed var(--separator); }
   html[data-style="graffiti"] .banner { border-bottom: 2px dashed var(--ink); font-family: var(--font-tag); font-size: 15px; }
@@ -962,7 +997,7 @@ const THEMES = {
   asphalt:  { name: 'Asphalt',  scheme: 'dark',  bg: '#0B0C10', bg2: '#15171C', bg3: '#1E2128', label: '#F2EFE9', accent: '#FFB020', accent2: '#FF6A3D' },
   neon:     { name: 'Neon',     scheme: 'dark',  bg: '#050308', bg2: '#120A1A', bg3: '#1B1026', label: '#F5F0FF', accent: '#FF2BD6', accent2: '#00E5FF' },
   brick:    { name: 'Brick',    scheme: 'dark',  bg: '#1A0F0C', bg2: '#2A1712', bg3: '#3A211A', label: '#F6E9E0', accent: '#E2543A', accent2: '#F0B27A' },
-  graffiti: { name: 'Graffiti', scheme: 'dark',  bg: '#0F0F12', bg2: '#19191F', bg3: '#23232B', label: '#FFFFFF', accent: '#B6FF3B', accent2: '#FF3B8D' },
+  graffiti: { name: 'Graffiti', scheme: 'dark',  bg: '#111014', bg2: '#1B1A20', bg3: '#25232B', label: '#E9E1D3', accent: '#AEF03C', accent2: '#FF4F98' },
   subway:   { name: 'Subway',   scheme: 'dark',  bg: '#101317', bg2: '#1A1F26', bg3: '#242B34', label: '#ECEFF3', accent: '#FFD100', accent2: '#EE352E' },
   concrete: { name: 'Concrete', scheme: 'light', bg: '#D9DADF', bg2: '#EDEEF1', bg3: '#FFFFFF', label: '#1C1C1E', accent: '#FF6A00', accent2: '#3A3D45' },
 };
