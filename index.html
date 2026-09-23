@@ -282,6 +282,19 @@
   .tb-btn:disabled { opacity: .4; cursor: default; background: none; }
   .switch:disabled { opacity: .45; cursor: default; }
   .tb-track { color: var(--label-2); font-weight: 400; max-width: clamp(90px, 18vw, 220px); }
+  .tb-rec { color: var(--danger); }
+  .tb-rec.on { background: rgba(255,69,58,.16); animation: recpulse 1.2s ease-in-out infinite; }
+  .tb-rec.on #tbRecTime { font-variant-numeric: tabular-nums; font-size: 13px; }
+  .tb-loop-label { font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+  .tb-loop-label:empty { display: none; }
+  .tb-ab { font-weight: 700; font-size: 13px; letter-spacing: .04em; min-width: 34px; }
+  .tb-seg { padding: 2px; flex: none; }
+  .tb-seg button { padding: 5px 8px; display: inline-flex; align-items: center; color: var(--label-2); }
+  .tb-seg button[aria-pressed="true"] { color: var(--accent); }
+  .tb-seg svg { width: 16px; height: 16px; }
+  .toolbar { overflow-x: auto; scrollbar-width: none; }
+  .toolbar::-webkit-scrollbar { display: none; }
+  .tb-group { flex: none; }
   .tb-track[data-attached="true"]::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
   .tb-track span { overflow: hidden; text-overflow: ellipsis; }
 
@@ -517,8 +530,13 @@
     <footer class="toolbar">
       <div class="tb-group">
         <button class="tb-btn" id="tbPlay" aria-label="Play or pause (Ctrl+Space)"><span id="tbPlayIcon" data-icon="play"></span></button>
+        <button class="tb-btn tb-rec" id="tbRec" aria-label="Record a take" title="Record a take for this lyric"><span data-icon="rec"></span><span id="tbRecTime" hidden>0:00</span></button>
+        <button class="tb-btn" id="tbPrev" aria-label="Previous (Alt+Left)" title="Previous (Alt+←)"><span data-icon="prev"></span></button>
+        <button class="tb-btn" id="tbNext" aria-label="Next (Alt+Right)" title="Next (Alt+→)"><span data-icon="next"></span></button>
+        <div class="seg tb-seg" id="tbDir" title="Which list Previous and Next walk through"><button data-dir="beats" aria-label="Beats" aria-pressed="true"><span data-icon="music"></span></button><button data-dir="demos" aria-label="Demos of this lyric"><span data-icon="mic"></span></button></div>
         <button class="tb-btn tb-track" id="tbTrack" title="Beat player"><span>No beat</span></button>
-        <button class="tb-btn" id="tbLoop" aria-pressed="false" aria-label="Loop on or off (Alt+L)" title="Loop on/off (Alt+L)"><span data-icon="repeat"></span></button>
+        <button class="tb-btn" id="tbLoop" aria-pressed="false" aria-label="Loop mode (Alt+L)" title="Loop mode (Alt+L)"><span data-icon="repeat"></span><span class="tb-loop-label" id="tbLoopLabel"></span></button>
+        <button class="tb-btn tb-ab" id="tbAB" aria-pressed="false" aria-label="Set loop points" title="Press to set A, again to set B">A</button>
       </div>
       <div class="tb-group">
         <button class="tb-btn" id="tbMetro" aria-pressed="false" aria-label="Metronome (Alt+M)"><span data-icon="metro"></span><span id="tbBpm">90</span></button>
@@ -590,6 +608,11 @@
       <div class="row"><div><div class="lbl">Beats per line</div><div class="desc">Sets the auto-scroll speed in reading view</div></div><div class="ctl"><div class="stepper" data-setting="beatsPerLine" data-min="1" data-max="16"><button data-step="-1" aria-label="Fewer">−</button><span class="val"></span><button data-step="1" aria-label="More">+</button></div></div></div>
     </div>
 
+    <div class="sec-title">Demos</div>
+    <div class="inset">
+      <div class="row"><div><div class="lbl">Take format</div><div class="desc">WAV opens in FL Studio and any DAW; compressed is a fraction of the size</div></div><div class="ctl"><div class="seg" data-setting="takeFormat"><button data-value="wav">WAV</button><button data-value="compressed">Compressed</button></div></div></div>
+    </div>
+
     <div class="sec-title">Files</div>
     <div class="inset">
       <div class="row"><div class="lbl">Sort</div><div class="ctl"><div class="seg" data-setting="sort"><button data-value="modified">Recent</button><button data-value="name">Name</button></div></div></div>
@@ -602,7 +625,7 @@
       <div class="row"><span class="lbl">Previous / next track</span><kbd>Alt ← &nbsp;·&nbsp; Alt →</kbd></div>
       <div class="row"><span class="lbl">Volume</span><kbd>Alt ↑ &nbsp;·&nbsp; Alt ↓</kbd></div>
       <div class="row"><span class="lbl">Loop start / end</span><kbd>Ctrl [ &nbsp;·&nbsp; Ctrl ]</kbd></div>
-      <div class="row"><span class="lbl">Loop on / off</span><kbd>Alt L</kbd></div>
+      <div class="row"><span class="lbl">Loop mode (off · A–B · track · folder)</span><kbd>Alt L</kbd></div>
       <div class="row"><span class="lbl">Clear loop</span><kbd>Alt Shift L</kbd></div>
       <div class="row"><span class="lbl">Metronome</span><kbd>Alt M</kbd></div>
       <div class="row"><span class="lbl">Tap tempo</span><kbd>Alt T</kbd></div>
@@ -646,11 +669,10 @@
     </div>
     <div class="inset">
       <div class="row"><div><div class="lbl">Loop section</div><div class="desc" id="plLoopDesc">Set A, then B</div></div><div class="ctl"><button class="small-btn" id="plA">A</button><button class="small-btn" id="plB">B</button><button class="small-btn" id="plClear">Clear</button></div></div>
-      <div class="row"><div><div class="lbl">Loop active</div><div class="desc">Off keeps the points but plays straight through</div></div><div class="ctl"><button class="switch" role="switch" id="plLoopOn" aria-checked="true" aria-label="Loop active"></button></div></div>
-      <div class="row"><div class="lbl">Repeat track</div><div class="ctl"><button class="switch" role="switch" id="plLoopTrack" aria-checked="false" aria-label="Repeat track"></button></div></div>
+      <div class="row"><div><div class="lbl">Loop</div><div class="desc" id="plLoopModeDesc"></div></div><div class="ctl"><div class="seg" id="plLoopMode"><button data-mode="off">Off</button><button data-mode="ab">A–B</button><button data-mode="track">Track</button><button data-mode="folder">Folder</button></div></div></div>
       <div class="row"><div class="lbl">Volume</div><div class="ctl"><input type="range" min="0" max="100" value="100" id="plVol" aria-label="Volume"></div></div>
     </div>
-    <div class="sec-title">Playlist</div>
+    <div class="sec-title" id="plListTitle">Playlist</div>
     <ul class="inset" id="plList"></ul>
     <p class="group-note" id="plEmpty">Drop audio files anywhere, or add them below.</p>
     <div class="btn-row">
@@ -733,7 +755,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileAudio" accept="audio/*" multiple hidden>
 <audio id="audio" hidden></audio>
-<audio id="demoAudio" hidden></audio>
 
 <script>
 (() => {
@@ -797,6 +818,7 @@ const ICONS = {
   speakerOff: '<svg viewBox="0 0 24 24"><path d="M4 9.5v5h3l4 3.5v-12l-4 3.5z"/><path d="M15.5 9.5l4 5M19.5 9.5l-4 5"/></svg>',
   mic: '<svg viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M6 11.5a6 6 0 0 0 12 0M12 17.5v3M9 20.5h6"/></svg>',
   wave: '<svg viewBox="0 0 24 24"><path d="M3 12h2.5l2-6 3 12 3-9 2 5 2-2H21"/></svg>',
+  rec: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="currentColor" stroke="none"/></svg>',
 };
 const setIcon = (node, name) => { node.innerHTML = ICONS[name] || ''; node.dataset.icon = name; };
 $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
@@ -811,7 +833,7 @@ const DEFAULTS = {
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
   rhymeEquiv: [], rhymeGroups: [], rhymeIgnore: [],
   metroBpm: 90, metroSub: 1, metroAccent: true, metroVol: 60,
-  sort: 'modified', sidebar: true, beatsPerLine: 4, volume: 100,
+  sort: 'modified', sidebar: true, beatsPerLine: 4, volume: 100, loopMode: 'folder', takeFormat: 'wav',
   customTheme: null, lastPreset: 'system',
 };
 const LS = {
@@ -1668,7 +1690,74 @@ const Loops = {
 };
 
 const Player = {
-  items: [], idx: -1, url: null, loopA: null, loopB: null, loopTrack: false, loopTimer: null,
+  items: [], idx: -1, url: null, loopA: null, loopB: null, loopTimer: null,
+  // Which list Previous/Next (and the folder loop) walk through: the beats, or the open lyric's takes.
+  dirMode: 'beats',
+  pool() {
+    const demos = this.dirMode === 'demos', rel = state.doc && state.doc.rel;
+    const out = [];
+    this.items.forEach((it, i) => { if (demos ? (it.kind === 'take' && (!rel || it.rel === rel)) : it.kind !== 'take') out.push(i); });
+    return out;
+  },
+  step(delta) {
+    const pool = this.pool();
+    if (!pool.length) { toast(this.dirMode === 'demos' ? 'No takes for this lyric yet' : 'No beats loaded', 1400); return; }
+    const k = pool.indexOf(this.idx);
+    this.play(pool[k < 0 ? (delta > 0 ? 0 : pool.length - 1) : (k + delta + pool.length) % pool.length]);
+  },
+  async setDir(dir) {
+    if (dir === 'demos') {
+      if (!state.doc) { toast('Open a lyric to browse its takes', 1400); this.render(); return; }
+      await Demos.refresh();
+      this.ensureTakes(Demos.list, state.doc.rel);
+    }
+    this.dirMode = dir;
+    const pool = this.pool();
+    if (!pool.length) {
+      if (dir === 'demos') { this.dirMode = 'beats'; toast('No takes for this lyric yet · press record', 1800); }
+      this.render(); return;
+    }
+    if (!pool.includes(this.idx)) await this.play(pool[0], { autoplay: false });   // cue the first one, paused
+    this.render();
+  },
+  ensureTakes(list, rel) {
+    for (const x of list) if (!this.items.some(it => it.kind === 'take' && it.takeName === x.name)) this.items.push({ kind: 'take', name: x.name.replace(/\.[^.]+$/, ''), takeName: x.name, file: null, handle: x.handle, rel });
+  },
+  // Takes belong to one lyric: drop the previous lyric's takes from the list when another opens.
+  pruneTakes(rel) {
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const it = this.items[i];
+      if (it.kind !== 'take' || it.rel === rel) continue;
+      if (i === this.idx) this.idx = -1; else if (i < this.idx) this.idx--;
+      this.items.splice(i, 1);
+    }
+    if (this.idx < 0 && this.dirMode === 'demos') this.dirMode = 'beats';
+  },
+  // Loop modes: off (play through, then stop), ab (repeat the A–B section), track (repeat the track), folder (continue through the playlist and start over)
+  get loopMode() { return ['off', 'ab', 'track', 'folder'].includes(settings.loopMode) ? settings.loopMode : 'folder'; },
+  get loopOn() { return this.loopMode === 'ab'; },
+  modeLabel(mode) { return { off: 'Loop off', ab: 'Repeat A–B', track: 'Repeat track', folder: 'Loop folder' }[mode] || mode; },
+  setMode(mode, silent) {
+    if (!['off', 'ab', 'track', 'folder'].includes(mode)) return;
+    settings.loopMode = mode; saveSettings();
+    Loops.save(this.current()); this.render();
+    if (!silent) toast(this.modeLabel(mode), 1200);
+  },
+  cycleMode() {
+    const order = ['off', 'ab', 'track', 'folder'];
+    let i = order.indexOf(this.loopMode);
+    for (let k = 0; k < order.length; k++) { i = (i + 1) % order.length; if (order[i] !== 'ab' || (this.loopA != null && this.loopB != null)) break; }
+    this.setMode(order[i]);
+  },
+  toggleLoop() { this.cycleMode(); },
+  // Toolbar A/B button: first press sets A at the current position, the next sets B; with a loop set it starts over.
+  pressAB() {
+    if (this.idx < 0) { toast('Play a track first', 1400); return; }
+    if (this.loopA == null || this.loopB != null) {
+      this.loopA = this.time(); this.loopB = null; Loops.save(this.current()); this.render();
+      toast(`A at ${fmtTime(this.loopA)} · press again for B`, 1600);
+    } else this.setB();
+  },
   isAudioName: n => /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm|opus|aiff?)$/i.test(n),
   current() { return this.items[this.idx] || null; },
   isYT() { const it = this.current(); return !!it && it.kind === 'yt'; },
@@ -1677,8 +1766,11 @@ const Player = {
   duration() { const d = this.isYT() ? YT.dur : el.audio.duration; return isFinite(d) && d > 0 ? d : 0; },
   seek(t) { const d = this.duration(); const v = clamp(t, 0, d || t); if (this.isYT()) YT.seek(v); else el.audio.currentTime = v; },
   onEnded() {
-    if (this.loopTrack || this.items.length <= 1) { this.seek(0); if (this.isYT()) YT.play(); else el.audio.play().catch(() => {}); }
-    else this.next();
+    const mode = this.loopMode;
+    if (mode === 'off') { this.render(); return; }
+    if (mode === 'folder' && this.pool().length > 1) { this.next(); return; }   // stays within beats, or within this lyric's takes
+    this.seek(mode === 'ab' && this.loopA != null ? this.loopA : 0);
+    if (this.isYT()) YT.play(); else el.audio.play().catch(() => {});
   },
   addLink(text) {
     const id = parseYouTube(text);
@@ -1693,11 +1785,6 @@ const Player = {
     const saved = LS.get('lyr:yt', []);
     if (!Array.isArray(saved)) return;
     for (const s of saved) if (s && /^[A-Za-z0-9_-]{11}$/.test(s.id || '')) this.items.push({ kind: 'yt', id: s.id, name: String(s.name || 'YouTube video'), file: null, handle: null });
-  },
-  removeLink(i) {
-    const it = this.items[i]; if (!it || it.kind !== 'yt') return;
-    if (i === this.idx) { YT.hide(); this.idx = -1; } else if (i < this.idx) this.idx--;
-    this.items.splice(i, 1); this.saveLinks(); this.render();
   },
   add(files) {
     const wasEmpty = this.items.length === 0;
@@ -1720,17 +1807,16 @@ const Player = {
     this.idx = current ? kept.indexOf(current) : -1;
     this.render();
   },
-  pendingSeek: null, loopOn: true,
+  pendingSeek: null,
   // opts: { autoplay = true, seek, loopA, loopB, loopOn } — explicit values win; otherwise the song's own memory is used.
   async play(i, opts = {}) {
     const it = this.items[i]; if (!it) return;
     const autoplay = opts.autoplay !== false;
     this.idx = i;
-    if (autoplay) el.demoAudio.pause();
+    this.dirMode = it.kind === 'take' ? 'demos' : 'beats';
     const saved = Loops.get(it) || {};
     this.loopA = opts.loopA != null ? opts.loopA : (saved.a != null ? saved.a : null);
     this.loopB = opts.loopB != null ? opts.loopB : (saved.b != null ? saved.b : null);
-    this.loopOn = opts.loopOn != null ? !!opts.loopOn : (saved.on != null ? !!saved.on : true);
     const seek = 'seek' in opts ? opts.seek : saved.t;
     this.pendingSeek = seek > 0 ? seek : null;
     if (it.kind === 'yt') {
@@ -1795,9 +1881,9 @@ const Player = {
       return;
     }
     Sound.ensure();
-    if (el.audio.paused) { el.demoAudio.pause(); el.audio.play().catch(() => {}); } else el.audio.pause();
+    if (el.audio.paused) el.audio.play().catch(() => {}); else el.audio.pause();
   },
-  pauseAll() { el.audio.pause(); if (YT.playing) YT.pause(); el.demoAudio.pause(); },
+  pauseAll() { el.audio.pause(); if (YT.playing) YT.pause(); },
   fallbackId: null,
   // Shown when a video cannot play embedded: title, reason, and a button to watch it on YouTube.
   ytFallback(it, msg) {
@@ -1806,17 +1892,16 @@ const Player = {
     el.ytFbMsg.textContent = msg || '';
     this.render();
   },
-  next() { if (this.items.length) this.play((this.idx + 1) % this.items.length); },
+  next() { this.step(1); },
   prev() {
-    if (!this.items.length) return;
-    if (this.time() > 3 || this.items.length === 1) { this.seek(0); return; }
-    this.play((this.idx - 1 + this.items.length) % this.items.length);
+    if (this.idx >= 0 && (this.time() > 3 || this.pool().length <= 1)) { this.seek(0); return; }
+    this.step(-1);
   },
   setA() {
     if (this.idx < 0) return;
     this.loopA = this.time();
     if (this.loopB != null && this.loopB <= this.loopA + .2) this.loopB = null;
-    this.loopOn = true; Loops.save(this.current());
+    Loops.save(this.current());
     this.render(); toast(`Loop start ${fmtTime(this.loopA)}`, 1400);
   },
   setB() {
@@ -1824,14 +1909,16 @@ const Player = {
     const t = this.time();
     if (this.loopA == null) this.loopA = 0;
     if (t <= this.loopA + .2) { toast('Move past the loop start first', 1600); return; }
-    this.loopB = t; this.loopOn = true; Loops.save(this.current());
-    this.render(); toast(`Loop ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}`, 1600);
+    this.loopB = t;
+    if (this.loopMode !== 'ab') { settings.loopMode = 'ab'; saveSettings(); }   // completing a loop starts repeating it
+    Loops.save(this.current());
+    this.render(); toast(`Repeat ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}`, 1600);
   },
-  clearLoop(silent) { this.loopA = this.loopB = null; this.loopOn = true; Loops.save(this.current()); this.render(); if (!silent) toast('Loop cleared', 1200); },
-  toggleLoop() {
-    if (this.loopA == null || this.loopB == null) { toast('Set loop points A and B first', 1600); return; }
-    this.loopOn = !this.loopOn; Loops.save(this.current()); this.render();
-    toast(this.loopOn ? 'Loop on' : 'Loop off · points kept', 1200);
+  clearLoop(silent) {
+    this.loopA = this.loopB = null;
+    if (this.loopMode === 'ab') { settings.loopMode = 'folder'; saveSettings(); }
+    Loops.save(this.current()); this.render();
+    if (!silent) toast('Loop points cleared', 1200);
   },
   tick() { if (this.loopOn && this.loopA != null && this.loopB != null && !this.paused() && this.time() >= this.loopB) this.seek(this.loopA); },
   render() {
@@ -1853,30 +1940,57 @@ const Player = {
     }
     setIcon(el.tbPlayIcon, playing ? 'pause' : 'play');
     setIcon(el.plPlayIcon, playing ? 'pause' : 'play');
-    const label = Sound.capturing ? 'System audio' : it ? it.name : Beats.needsReopen ? 'Reopen music folder' : 'No beat';
+    const label = Sound.capturing ? 'System audio' : it ? it.name : this.dirMode === 'demos' ? 'No take' : Beats.needsReopen ? 'Reopen music folder' : 'No beat';
+    $$('button', el.tbDir).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.dir === this.dirMode)));
+    el.plListTitle.textContent = this.dirMode === 'demos' ? `Takes · ${state.doc ? stem(state.doc.name) : 'this lyric'}` : 'Playlist';
     el.tbTrack.firstElementChild.textContent = label; el.tbTrack.title = label;
     el.plTitle.textContent = Sound.capturing ? 'System audio' : it ? it.name : 'Nothing loaded';
     el.plSub.textContent = Sound.capturing ? 'Listening to what your computer plays' : it ? `${this.idx + 1} of ${this.items.length}` : Beats.needsReopen ? 'Your music folder is remembered. Reopen it to load the tracks.' : 'Add audio files, or capture what’s playing on your computer.';
     el.plReopenBeats.hidden = !Beats.needsReopen;
     el.plFolderNote.hidden = !Beats.handle;
     if (Beats.handle) el.plFolderNote.textContent = `Music folder: “${Beats.handle.name}”. Choose “Music Folder…” to pick a different one.`;
-    const hasLoop = this.loopA != null && this.loopB != null;
-    el.plLoopDesc.textContent = this.loopA == null ? 'Set A, then B' : this.loopB == null ? `A ${fmtTime(this.loopA)} · now set B` : `${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}${this.loopOn ? '' : ' · off'}`;
+    const hasLoop = this.loopA != null && this.loopB != null, mode = this.loopMode;
+    el.plLoopDesc.textContent = this.loopA == null ? 'Set A, then B' : this.loopB == null ? `A ${fmtTime(this.loopA)} · now set B` : `${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}${mode === 'ab' ? '' : ' · not repeating'}`;
     el.plA.setAttribute('aria-pressed', String(this.loopA != null));
     el.plB.setAttribute('aria-pressed', String(this.loopB != null));
-    el.plLoopOn.setAttribute('aria-checked', String(hasLoop && this.loopOn));
-    el.plLoopOn.disabled = !hasLoop;
-    el.tbLoop.setAttribute('aria-pressed', String(hasLoop && this.loopOn));
-    el.tbLoop.disabled = !hasLoop;
-    el.tbLoop.title = hasLoop ? `Loop ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)} · ${this.loopOn ? 'on' : 'off'} (Alt+L)` : 'No loop points yet (Ctrl+[ and Ctrl+])';
-    el.plLoopTrack.setAttribute('aria-checked', String(this.loopTrack));
+    $$('button', el.plLoopMode).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+    el.plLoopModeDesc.textContent = { off: 'Play through, then stop', ab: hasLoop ? `Repeat ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)}` : 'Set A and B to repeat a section', track: 'Repeat the current track', folder: 'Continue through the playlist and start over' }[mode];
+    el.tbLoop.setAttribute('aria-pressed', String(mode !== 'off'));
+    el.tbLoopLabel.textContent = { off: '', ab: 'A–B', track: '1', folder: 'All' }[mode];
+    el.tbLoop.title = `${this.modeLabel(mode)} · click to change (Alt+L)`;
+    el.tbAB.textContent = this.loopA == null ? 'A' : this.loopB == null ? 'B' : 'AB';
+    el.tbAB.setAttribute('aria-pressed', String(hasLoop));
+    el.tbAB.title = this.loopA == null ? 'Press to set A at the current position' : this.loopB == null ? `A ${fmtTime(this.loopA)} · press to set B` : `Loop ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)} · press to start a new one`;
     el.plCapture.textContent = Sound.capturing ? 'Stop Capture' : 'Capture System Audio';
-    el.plList.innerHTML = this.items.map((x, i) => `<li class="cell pl-cell${i === this.idx ? ' active' : ''}" data-i="${i}"><span class="ico">${x.kind === 'yt' ? ICONS.screen : ICONS.music}</span><div class="txt"><div class="ttl">${esc(x.name)}</div>${x.kind === 'yt' ? '<div class="sub">YouTube</div>' : ''}</div>${x.kind === 'yt' ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove">${ICONS.xmark}</button>` : ''}</li>`).join('');
-    el.plEmpty.hidden = this.items.length > 0;
+    const pool = this.pool();
+    el.plList.innerHTML = pool.map(i => {
+      const x = this.items[i];
+      const icon = x.kind === 'yt' ? ICONS.screen : x.kind === 'take' ? ICONS.mic : ICONS.music;
+      const sub = x.kind === 'yt' ? '<div class="sub">YouTube</div>' : x.kind === 'take' ? '<div class="sub">Take</div>' : '';
+      const rm = x.kind === 'yt' || x.kind === 'take' ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button>` : '';
+      return `<li class="cell pl-cell${i === this.idx ? ' active' : ''}" data-i="${i}"><span class="ico">${icon}</span><div class="txt"><div class="ttl">${esc(x.name)}</div>${sub}</div>${rm}</li>`;
+    }).join('');
+    el.plEmpty.hidden = pool.length > 0;
+    el.plEmpty.textContent = this.dirMode === 'demos' ? 'No takes for this lyric yet. Press the record button to make one.' : 'Drop audio files anywhere, or add them below.';
     this.renderTime();
-    const needTick = playing && this.loopOn && this.loopB != null;
+    const needTick = playing && mode === 'ab' && hasLoop;
     if (needTick && !this.loopTimer) this.loopTimer = setInterval(() => this.tick(), 40);
     if (!needTick && this.loopTimer) { clearInterval(this.loopTimer); this.loopTimer = null; }
+    if (Sheet.current === el.sheet_demos) Demos.render();
+  },
+  // Play a recorded take through the main player, so the waveform, transport and volume all apply to it.
+  playTake(x, rel) {
+    let i = this.items.findIndex(it => it.kind === 'take' && it.takeName === x.name);
+    if (i < 0) { this.items.push({ kind: 'take', name: x.name.replace(/\.[^.]+$/, ''), takeName: x.name, file: null, handle: x.handle, rel }); i = this.items.length - 1; }
+    if (i === this.idx) { this.toggle(); return; }
+    this.play(i);
+  },
+  removeItem(i) {
+    const it = this.items[i]; if (!it || (it.kind !== 'yt' && it.kind !== 'take')) return;
+    if (i === this.idx) { this.pauseAll(); YT.hide(); this.idx = -1; } else if (i < this.idx) this.idx--;
+    this.items.splice(i, 1);
+    if (it.kind === 'yt') this.saveLinks();
+    this.render(); Wave.draw(true);
   },
   renderTime() { Wave.draw(); },
 };
@@ -1909,15 +2023,23 @@ el.ytWatch.addEventListener('click', () => {
 });
 el.plPrev.addEventListener('click', () => Player.prev());
 el.plNext.addEventListener('click', () => Player.next());
+el.tbPrev.addEventListener('click', () => Player.prev());
+el.tbNext.addEventListener('click', () => Player.next());
+el.tbDir.addEventListener('click', e => { const b = e.target.closest('button[data-dir]'); if (b) Player.setDir(b.dataset.dir); });
 el.plA.addEventListener('click', () => Player.setA());
 el.plB.addEventListener('click', () => Player.setB());
 el.plClear.addEventListener('click', () => Player.clearLoop());
-el.plLoopOn.addEventListener('click', () => Player.toggleLoop());
-el.tbLoop.addEventListener('click', () => Player.toggleLoop());
-el.plLoopTrack.addEventListener('click', () => { Player.loopTrack = !Player.loopTrack; Player.render(); });
+el.tbLoop.addEventListener('click', () => Player.cycleMode());
+el.tbAB.addEventListener('click', () => Player.pressAB());
+el.tbRec.addEventListener('click', () => { if (!state.doc && !Demos.rec) { toast('Open a lyric to record a take', 1600); return; } Demos.toggle(); });
+el.plLoopMode.addEventListener('click', e => {
+  const b = e.target.closest('button[data-mode]'); if (!b) return;
+  if (b.dataset.mode === 'ab' && (Player.loopA == null || Player.loopB == null)) toast('Set A and B to repeat a section', 1600);
+  Player.setMode(b.dataset.mode, true);
+});
 el.plList.addEventListener('click', e => {
   const rm = e.target.closest('[data-remove]');
-  if (rm) { e.stopPropagation(); Player.removeLink(+rm.dataset.remove); return; }
+  if (rm) { e.stopPropagation(); Player.removeItem(+rm.dataset.remove); return; }
   const c = e.target.closest('.pl-cell'); if (c) Player.play(+c.dataset.i);
 });
 el.plAddFiles.addEventListener('click', () => el.fileAudio.click());
@@ -2658,7 +2780,7 @@ async function openRel(rel, opts) {
 async function openFile(entry, opts = {}) {
   if (state.doc && state.doc.rel === entry.rel && !opts.force) { showDoc(); if (state.editing && innerWidth > 760) el.ta.focus(); return; }
   if (state.doc && !opts.force) Bindings.saveState(state.doc);
-  if (!opts.force) { Loops.save(Player.current()); Player.pauseAll(); YT.destroy(); Player.render(); }
+  if (!opts.force) { Loops.save(Player.current()); Player.pauseAll(); YT.destroy(); Player.pruneTakes(entry.rel); Player.render(); }
   saveDraftNow(); await flushSave();
   let disk;
   try { disk = await FS.read(entry.handle); } catch (e) { handleFsError(e); return; }
@@ -3126,13 +3248,11 @@ const Bindings = {
     if (i < 0) { toast(`Attached beat “${rec.beat.name}” is not loaded. Reopen the music folder or add the file.`, 3600); return; }
     const cur = Player.current();
     const loaded = i === Player.idx && cur && (cur.kind !== 'yt' || (YT.iframe && YT.videoId === cur.id));
-    if (loaded) {
-      Player.loopA = rec.loopA != null ? rec.loopA : null; Player.loopB = rec.loopB != null ? rec.loopB : null;
-      Player.loopOn = rec.loopOn != null ? !!rec.loopOn : true;
-      Player.render(); return;
-    }
+    if (loaded) { Player.loopA = rec.loopA != null ? rec.loopA : null; Player.loopB = rec.loopB != null ? rec.loopB : null; }
     // Switching lyrics always leaves the player paused: cue the beat at its saved spot, ready for Play.
-    await Player.play(i, { autoplay: false, seek: rec.time || 0, loopA: rec.loopA, loopB: rec.loopB, loopOn: rec.loopOn });
+    else await Player.play(i, { autoplay: false, seek: rec.time || 0, loopA: rec.loopA, loopB: rec.loopB });
+    if (Player.loopA != null && Player.loopB != null && rec.loopOn !== false && Player.loopMode !== 'ab') Player.setMode('ab', true);
+    else Player.render();
   },
 };
 el.plAttach.addEventListener('click', () => {
@@ -3146,7 +3266,6 @@ let volumeBeforeMute = 100;
 function setVolume(v, fromSlider) {
   settings.volume = clamp(Math.round(v), 0, 100); saveSettings();
   el.audio.volume = settings.volume / 100;
-  el.demoAudio.volume = settings.volume / 100;
   YT.setVolume(settings.volume);
   el.plVol.value = String(settings.volume);
   el.waveVol.value = String(settings.volume);
@@ -3189,7 +3308,7 @@ const Wave = {
         if (this.dragEdge) {
           this.dragEdge = null;
           if (this.creating && Player.loopB == null) Player.loopA = null;
-          else if (this.creating) Player.loopOn = true;
+          else if (this.creating && Player.loopMode !== 'ab') Player.setMode('ab', true);
           this.creating = false;
           Loops.save(Player.current());
           Player.render();
@@ -3380,6 +3499,7 @@ function onSettingChange(key) {
     case 'synizesis': case 'rhymes': case 'rhymeStrict': case 'rhymeWindow': case 'rhymeLines': case 'internalRhymes': case 'linesPerBar': queueRender(); if (!state.editing) renderReader(); break;
     case 'metroBpm': case 'metroSub': case 'metroAccent': case 'metroVol': Metro.render(); break;
     case 'beatsPerLine': AutoScroll.render(); break;
+    case 'takeFormat': Demos.render(); break;
     case 'sort': sortFiles(); renderList(); break;
     default: break;
   }
@@ -3820,10 +3940,36 @@ function applyAllSettings() {
    ============================================================ */
 const fmtSize = b => b < 1e6 ? `${Math.max(1, Math.round(b / 1e3))} KB` : `${(b / 1e6).toFixed(1)} MB`;
 const stamp = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}.${p(d.getMinutes())}.${p(d.getSeconds())}`; };
+// Float samples → 16-bit PCM, and PCM chunks → a WAV file. That is all a DAW-ready take needs.
+function toInt16(f) {
+  const q = new Int16Array(f.length);
+  for (let i = 0; i < f.length; i++) { const s = f[i] < -1 ? -1 : f[i] > 1 ? 1 : f[i]; q[i] = s < 0 ? s * 0x8000 : s * 0x7FFF; }
+  return q;
+}
+function encodeWav(pcm, channels, sampleRate) {
+  const frames = Math.min(...pcm.map(list => list.reduce((s, a) => s + a.length, 0)));
+  const blockAlign = channels * 2, dataLen = frames * blockAlign;
+  const buf = new ArrayBuffer(44 + dataLen), v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + dataLen, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, channels, true);
+  v.setUint32(24, sampleRate, true); v.setUint32(28, sampleRate * blockAlign, true); v.setUint16(32, blockAlign, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, dataLen, true);
+  const chans = pcm.map(list => {
+    const a = new Int16Array(frames); let o = 0;
+    for (const q of list) { if (o >= frames) break; const n = Math.min(q.length, frames - o); a.set(n === q.length ? q : q.subarray(0, n), o); o += n; }
+    return a;
+  });
+  const out = new Int16Array(buf, 44, frames * channels);
+  if (channels === 1) out.set(chans[0]);
+  else for (let f = 0, p = 0; f < frames; f++) for (let c = 0; c < channels; c++) out[p++] = chans[c][f];
+  return new Blob([buf], { type: 'audio/wav' });
+}
 const Demos = {
   rec: null, chunks: [], stream: null, startAt: 0, timer: null, mime: '', ext: 'webm', doc: null,
   list: [], playing: null, url: null, meter: null, meterRaf: 0,
-  supported() { return !!(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); },
+  supported() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.AudioContext || window.webkitAudioContext)); },
+  wavMode() { return settings.takeFormat !== 'compressed' || !window.MediaRecorder; },
   pickType() {
     const cands = [['audio/mp4', 'm4a'], ['audio/webm;codecs=opus', 'webm'], ['audio/webm', 'webm'], ['audio/ogg;codecs=opus', 'ogg']];
     for (const [m, ext] of cands) { try { if (MediaRecorder.isTypeSupported(m)) return { mime: m, ext }; } catch { /* ignore */ } }
@@ -3873,6 +4019,8 @@ const Demos = {
     const d = state.doc, ok = this.supported();
     el.demoTitle.textContent = d ? `Demos · ${stem(d.name)}` : 'Demos';
     el.btnDemos.classList.toggle('rec', !!this.rec);
+    el.tbRec.classList.toggle('on', !!this.rec);
+    el.tbRec.title = this.rec ? 'Stop recording' : 'Record a take for this lyric';
     el.recBtn.classList.toggle('on', !!this.rec);
     el.recBtn.setAttribute('aria-label', this.rec ? 'Stop recording' : 'Start recording');
     el.recBtn.disabled = !ok || (!d && !this.rec);
@@ -3880,12 +4028,15 @@ const Demos = {
     const p = d ? this.prefix(d) : '';
     el.demoList.innerHTML = this.list.map((x, i) => {
       const label = x.name.slice(p.length).replace(/\.[^.]+$/, '');
-      const playingThis = this.playing === x.name && !el.demoAudio.paused;
+      const cur = Player.current();
+      const playingThis = !!cur && cur.kind === 'take' && cur.takeName === x.name && !Player.paused();
       return `<li class="cell demo-cell" data-i="${i}"><button class="icon-btn" data-play="${i}" aria-label="${playingThis ? 'Pause' : 'Play'}">${playingThis ? ICONS.pause : ICONS.play}</button><div class="txt"><div class="ttl">${esc(label)}</div><div class="sub"><b>${esc(fmtDate(x.modified))}</b>${esc(fmtSize(x.size))} · ${esc(x.name.split('.').pop().toUpperCase())}</div></div><button class="icon-btn cell-more" data-demo-more="${i}" aria-label="Take options">${ICONS.more}</button></li>`;
     }).join('');
     el.demoEmpty.hidden = this.list.length > 0 || !d;
     const t = this.pickType();
-    el.demoNote.textContent = ok ? `Takes are saved in the folder’s “demos” folder as .${t.ext} files (${t.ext === 'm4a' ? 'AAC' : 'Opus'}), the format this browser records natively, and listed in lyrics-settings.yaml. Play the beat while recording to capture it too.` : '';
+    el.demoNote.textContent = !ok ? '' : this.wavMode()
+      ? 'Takes are saved as 16-bit WAV in the folder’s “demos” folder, ready for FL Studio or any DAW (about 5–6 MB per minute, mono). Settings › Demos switches to small compressed files. Play the beat while recording to capture it too.'
+      : `Takes are saved compressed (.${t.ext}, ${t.ext === 'm4a' ? 'AAC' : 'Opus'}) in the folder’s “demos” folder. Settings › Demos switches to WAV for DAW-ready files; existing takes can be converted from their menu.`;
   },
   async toggle() { if (this.rec) this.stop(); else await this.start(); },
   async start() {
@@ -3894,40 +4045,103 @@ const Demos = {
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } }); }
     catch (e) { console.warn(e); toast(e && e.name === 'NotAllowedError' ? 'Microphone access was not allowed' : 'No microphone is available', 3200); return; }
-    const t = this.pickType(); this.mime = t.mime; this.ext = t.ext;
-    let rec;
-    try { rec = new MediaRecorder(stream, t.mime ? { mimeType: t.mime, audioBitsPerSecond: 96000 } : undefined); }
-    catch (e) { console.warn(e); stream.getTracks().forEach(x => x.stop()); toast('Could not start the recorder'); return; }
-    this.stream = stream; this.rec = rec; this.chunks = []; this.startAt = Date.now(); this.doc = d;
-    rec.addEventListener('dataavailable', e => { if (e.data && e.data.size) this.chunks.push(e.data); });
-    rec.addEventListener('stop', () => this.finish());
-    rec.addEventListener('error', e => { console.warn(e); toast('Recording error'); });
-    rec.start(1000);
-    this.timer = setInterval(() => { el.recTime.textContent = fmtTime((Date.now() - this.startAt) / 1000); }, 250);
+    this.stream = stream; this.chunks = []; this.startAt = Date.now(); this.doc = d;
+    if (this.wavMode()) {
+      // Raw PCM straight from the microphone, quantized to 16-bit as it arrives; written as WAV on stop.
+      const ctx = Sound.ensure(), track = stream.getAudioTracks()[0];
+      const channels = Math.min(2, Math.max(1, (track && track.getSettings && track.getSettings().channelCount) || 1));
+      let src, proc, mute;
+      try {
+        src = ctx.createMediaStreamSource(stream);
+        proc = ctx.createScriptProcessor(4096, channels, 1);
+        mute = ctx.createGain(); mute.gain.value = 0;
+      } catch (e) { console.warn(e); stream.getTracks().forEach(x => x.stop()); this.stream = null; toast('Could not start the recorder'); return; }
+      const pcm = Array.from({ length: channels }, () => []);
+      proc.onaudioprocess = e => { for (let c = 0; c < channels; c++) pcm[c].push(toInt16(e.inputBuffer.getChannelData(c))); };
+      src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
+      this.rec = { wav: true, src, proc, mute, pcm, channels, sampleRate: ctx.sampleRate };
+      this.ext = 'wav'; this.mime = 'audio/wav';
+    } else {
+      const t = this.pickType(); this.mime = t.mime; this.ext = t.ext;
+      let rec;
+      try { rec = new MediaRecorder(stream, t.mime ? { mimeType: t.mime, audioBitsPerSecond: 96000 } : undefined); }
+      catch (e) { console.warn(e); stream.getTracks().forEach(x => x.stop()); this.stream = null; toast('Could not start the recorder'); return; }
+      this.rec = rec;
+      rec.addEventListener('dataavailable', e => { if (e.data && e.data.size) this.chunks.push(e.data); });
+      rec.addEventListener('stop', () => this.finish());
+      rec.addEventListener('error', e => { console.warn(e); toast('Recording error'); });
+      rec.start(1000);
+    }
+    el.tbRecTime.hidden = false;
+    this.timer = setInterval(() => { const t = fmtTime((Date.now() - this.startAt) / 1000); el.recTime.textContent = t; el.tbRecTime.textContent = t; }, 250);
     this.startMeter(stream);
     this.render();
   },
-  stop() { if (!this.rec) return; try { this.rec.stop(); } catch (e) { console.warn(e); this.finish(); } },
-  async finish() {
+  stop() {
+    if (!this.rec) return;
+    if (this.rec.wav) { this.finishWav(); return; }
+    try { this.rec.stop(); } catch (e) { console.warn(e); this.finish(); }
+  },
+  // Common wrap-up: timers, meter, microphone and the recording UI.
+  teardown() {
     clearInterval(this.timer); this.timer = null; this.stopMeter();
-    const rec = this.rec, doc = this.doc, chunks = this.chunks, mime = (rec && rec.mimeType) || this.mime, seconds = (Date.now() - this.startAt) / 1000;
-    this.rec = null; this.chunks = [];
+    const seconds = (Date.now() - this.startAt) / 1000, doc = this.doc;
+    this.rec = null;
     if (this.stream) { this.stream.getTracks().forEach(x => x.stop()); this.stream = null; }
     el.recTime.textContent = '0:00'; el.recLevel.style.width = '0';
+    el.tbRecTime.hidden = true; el.tbRecTime.textContent = '0:00';
     this.render();
+    return { seconds, doc };
+  },
+  finishWav() {
+    const r = this.rec;
+    try { r.proc.onaudioprocess = null; r.src.disconnect(); r.proc.disconnect(); r.mute.disconnect(); } catch { /* ignore */ }
+    const { seconds, doc } = this.teardown();
+    const frames = r.pcm[0] ? r.pcm[0].reduce((s, a) => s + a.length, 0) : 0;
+    if (!frames || !doc) { toast('Nothing was recorded'); return; }
+    this.save(doc, encodeWav(r.pcm, r.channels, r.sampleRate), 'wav', seconds);
+  },
+  finish() {
+    const rec = this.rec, chunks = this.chunks, mime = (rec && rec.mimeType) || this.mime;
+    this.chunks = [];
+    const { seconds, doc } = this.teardown();
     if (!chunks.length || !doc) { toast('Nothing was recorded'); return; }
-    const blob = new Blob(chunks, { type: mime || 'application/octet-stream' });
-    const fileName = `${this.prefix(doc)}${stamp()}.${this.ext}`;
+    this.save(doc, new Blob(chunks, { type: mime || 'application/octet-stream' }), this.ext, seconds);
+  },
+  async save(doc, blob, ext, seconds) {
+    const fileName = `${this.prefix(doc)}${stamp()}.${ext}`;
     try {
       const dir = await this.dir(doc, true);
       const name = await FS.uniqueName(dir, fileName);
       const h = await dir.getFileHandle(name, { create: true });
       const w = await h.createWritable();
       try { await w.write(await blob.arrayBuffer()); await w.close(); } catch (e) { try { await w.abort(); } catch { /* ignore */ } throw e; }
-      toast(`Take saved · ${fmtTime(seconds)}`, 2000);
+      toast(`Take saved · ${fmtTime(seconds)} · ${fmtSize(blob.size)}`, 2200);
       await this.syncNames(doc);
       if (state.doc && state.doc.rel === doc.rel) await this.refresh();
     } catch (e) { console.warn(e); this.download(blob, fileName); toast('The take could not be saved in the folder, so it was downloaded instead', 4200); }
+  },
+  // Decode an existing compressed take in the browser and rewrite it as WAV; the original goes to Trash/demos.
+  async convert(i) {
+    const x = this.list[i], d = state.doc; if (!x || !d) return;
+    toast('Converting to WAV…', 1500);
+    try {
+      const buf = await (await x.handle.getFile()).arrayBuffer();
+      const audio = await Sound.ensure().decodeAudioData(buf);
+      const channels = Math.min(2, audio.numberOfChannels), pcm = [];
+      for (let c = 0; c < channels; c++) pcm.push([toInt16(audio.getChannelData(c))]);
+      const blob = encodeWav(pcm, channels, audio.sampleRate);
+      const name = await FS.uniqueName(x.dir, x.name.replace(/\.[^.]+$/, '') + '.wav');
+      const h = await x.dir.getFileHandle(name, { create: true });
+      const w = await h.createWritable();
+      try { await w.write(await blob.arrayBuffer()); await w.close(); } catch (e) { try { await w.abort(); } catch { /* ignore */ } throw e; }
+      const pi = Player.items.findIndex(it => it.kind === 'take' && it.takeName === x.name);
+      if (pi >= 0) Player.removeItem(pi);
+      const tdir = await (await FS.getTrash()).getDirectoryHandle('demos', { create: true });
+      await FS.move(x.dir, x.handle, tdir, await FS.uniqueName(tdir, x.name));
+      await this.refresh();
+      toast(`Converted to WAV · ${fmtSize(blob.size)} · original moved to Recently Deleted`, 3000);
+    } catch (e) { console.warn(e); toast('This browser could not decode that take', 3200); }
   },
   download(blob, name) {
     const url = URL.createObjectURL(blob);
@@ -3952,14 +4166,11 @@ const Demos = {
     } catch (e) { console.warn(e); }
   },
   stopMeter() { cancelAnimationFrame(this.meterRaf); if (this.meter) { try { this.meter.src.disconnect(); } catch { /* ignore */ } this.meter = null; } },
-  async play(i) {
-    const x = this.list[i]; if (!x) return;
-    if (this.playing === x.name) { if (el.demoAudio.paused) el.demoAudio.play().catch(() => {}); else el.demoAudio.pause(); return; }
-    Player.pauseAll();
-    if (this.url) URL.revokeObjectURL(this.url);
-    try { this.url = URL.createObjectURL(await x.handle.getFile()); } catch (e) { console.warn(e); toast('Could not open that take'); return; }
-    this.playing = x.name; el.demoAudio.src = this.url;
-    el.demoAudio.play().catch(() => toast('This take cannot be played in this browser'));
+  // Takes play through the main player: waveform, transport, seeking and volume all apply.
+  play(i) {
+    const x = this.list[i]; if (!x || !state.doc) return;
+    Player.ensureTakes(this.list, state.doc.rel);   // so Previous/Next walk through all takes of this lyric
+    Player.playTake(x, state.doc.rel);
     this.render();
   },
   menu(anchor, i) {
@@ -3967,6 +4178,7 @@ const Demos = {
     Menu.open(anchor, [
       { label: 'Rename', icon: 'pencil', onClick: () => this.rename(i) },
       { label: 'Download', icon: 'doc', onClick: async () => { try { this.download(await x.handle.getFile(), x.name); } catch { toast('Could not read that take'); } } },
+      ...(/\.wav$/i.test(x.name) ? [] : [{ label: 'Convert to WAV', icon: 'wave', onClick: () => this.convert(i) }]),
       { label: 'Delete', icon: 'trash', destructive: true, onClick: () => this.remove(i) },
     ]);
   },
@@ -3981,8 +4193,9 @@ const Demos = {
     if (name === x.name) return;
     try {
       if (await FS.exists(x.dir, name)) { toast('A take with that name already exists'); return; }
-      await FS.move(x.dir, x.handle, x.dir, name);
-      if (this.playing === x.name) this.playing = name;
+      const h = await FS.move(x.dir, x.handle, x.dir, name);
+      const it = Player.items.find(t => t.kind === 'take' && t.takeName === x.name);
+      if (it) { it.takeName = name; it.name = name.replace(/\.[^.]+$/, ''); it.handle = h; Player.render(); }
       await this.refresh();
     } catch (e) { handleFsError(e); }
   },
@@ -3993,7 +4206,8 @@ const Demos = {
     try {
       const tdir = await (await FS.getTrash()).getDirectoryHandle('demos', { create: true });
       await FS.move(x.dir, x.handle, tdir, await FS.uniqueName(tdir, x.name));
-      if (this.playing === x.name) { el.demoAudio.pause(); this.playing = null; }
+      const pi = Player.items.findIndex(it => it.kind === 'take' && it.takeName === x.name);
+      if (pi >= 0) Player.removeItem(pi);
       await this.refresh(); toast('Take moved to Recently Deleted', 1600);
     } catch (e) { handleFsError(e); }
   },
@@ -4028,7 +4242,6 @@ el.demoList.addEventListener('click', e => {
   const more = e.target.closest('[data-demo-more]'); if (more) { Demos.menu(more, +more.dataset.demoMore); return; }
   const play = e.target.closest('[data-play]'); if (play) Demos.play(+play.dataset.play);
 });
-['play', 'pause', 'ended'].forEach(ev => el.demoAudio.addEventListener(ev, () => Demos.render()));
 addEventListener('beforeunload', () => { if (Demos.rec) Demos.stop(); });
 
 /* ============================================================
