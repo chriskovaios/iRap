@@ -32,7 +32,7 @@
   html, body { height: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--label); font-family: var(--font); font-size: 17px;
-    -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-text-size-adjust: 100%;
+    -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; -webkit-text-size-adjust: 100%; touch-action: manipulation;
     transition: background-color var(--dur), color var(--dur);
   }
   button { font-family: inherit; color: inherit; }
@@ -165,6 +165,9 @@
     white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 4;
     padding: 0 0 0 var(--gutter-w); margin: 0; border: 0; width: 100%; text-align: left;
   }
+  .mirror, .ta, .ta::placeholder, .reader { font-family: var(--font-lyric, var(--font)); }   /* set by the Lyric Font picker */
+  .font-cell .ttl { font-size: 18px; }
+  .font-cell .sub { font-size: 15px; }
   .mirror { color: transparent; min-height: calc(var(--editor-line) * 6); pointer-events: none; }
   .mirror .ln { min-height: var(--editor-line); }
   .mirror .rh { background: var(--tint); box-shadow: 0 0 0 3px var(--tint); border-radius: 5px; }
@@ -439,15 +442,10 @@
   /* No Apple faces anywhere in this style: UI text in a condensed stencil-like sans, lyrics in the marker hand. */
   html[data-style="graffiti"] {
     --font: "Bahnschrift", "Bahnschrift SemiCondensed", "AvenirNextCondensed-Medium", "Avenir Next Condensed", "Franklin Gothic Medium", "Trebuchet MS", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
-    --font-lyric: var(--font-tag);
+    --font-lyric: var(--font-tag);   /* the style's default lyric face; the Lyric Font picker overrides it inline */
   }
-  html[data-style="graffiti"][data-lyric-font="stencil"] { --font-lyric: var(--font); }
-  html[data-style="graffiti"][data-lyric-font="plain"] { --font-lyric: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
   html[data-style="graffiti"] body { font-family: var(--font); }
-  html[data-style="graffiti"] .mirror, html[data-style="graffiti"] .ta, html[data-style="graffiti"] .reader { font-family: var(--font-lyric); }
-  html[data-style="graffiti"] .ta::placeholder { font-family: var(--font-lyric); }
   html[data-style="graffiti"] .about, html[data-style="graffiti"] .group-note, html[data-style="graffiti"] .rules, html[data-style="graffiti"] .search input, html[data-style="graffiti"] .yt-form input, html[data-style="graffiti"] .alert input, html[data-style="graffiti"] .menu button, html[data-style="graffiti"] .title, html[data-style="graffiti"] .pick-words { font-family: var(--font); }
-  html[data-style="ios"] #lyricFontRow { display: none; }
   /* Ink is the text color pulled a step toward the background: paper-white, never blinding. */
   @supports (color: color-mix(in srgb, red, blue)) {
     html[data-style="graffiti"] { --ink: color-mix(in srgb, var(--label) 91%, var(--bg)); }
@@ -568,6 +566,19 @@
   @media (max-width: 480px) {
     .large-title { font-size: 30px; }
     .counts { display: none; }
+    #tbAB, #tbHelpers { display: none; }
+    .tb-btn { min-width: 32px; padding: 0 4px; }
+    .tb-track { max-width: 72px; }
+    .tb-group { gap: 0; }
+    .nav { padding: 0 6px; gap: 4px; }
+    .nav-btn { padding: 6px 5px; font-size: 16px; }
+    .doc-title { font-size: 16px; }
+    .sheet-body { padding: 0 12px calc(24px + var(--safe-b)); }
+    .row { padding: 8px 12px; }
+    .swatches { padding: 12px 10px; }
+    .pickbar { bottom: calc(var(--toolbar-h) + var(--wave-h) + 8px + var(--safe-b)); padding: 6px 8px; }
+    .wave-time { font-size: 9px; }
+    .reader.with-syl .rl { padding: 0 26px; }
     .row { flex-wrap: wrap; }
     .row .ctl { margin-left: auto; }
     .seg button { padding: 6px 8px; font-size: 12px; }
@@ -725,7 +736,7 @@
     <div class="sec-title">Theme</div>
     <div class="inset">
       <div class="row"><div><div class="lbl">Style</div><div class="desc">Graffiti stickers and block letters, or the plain iPhone look</div></div><div class="ctl"><div class="seg" data-setting="uiStyle"><button data-value="graffiti">Graffiti</button><button data-value="ios">iPhone</button></div></div></div>
-      <div class="row" id="lyricFontRow"><div><div class="lbl">Lyric font</div><div class="desc">How the lyric text itself is drawn in the graffiti style</div></div><div class="ctl"><div class="seg" data-setting="lyricFont"><button data-value="marker">Marker</button><button data-value="stencil">Stencil</button><button data-value="plain">Plain</button></div></div></div>
+      <div class="row"><div><div class="lbl">Lyric font</div><div class="desc">The face used for the lyric text, built in or from your folder</div></div><div class="ctl"><button class="small-btn" id="setLyricFont">Style default</button></div></div>
       <div class="swatches" id="swatches"></div>
       <div id="customTheme" hidden>
         <div class="row"><div class="lbl">Background</div><div class="ctl"><input type="color" data-color="bg" aria-label="Background color"></div></div>
@@ -896,6 +907,20 @@
   </div>
 </section>
 
+<section class="sheet" id="sheet_fonts" role="dialog" aria-label="Lyric font">
+  <div class="grabber"></div>
+  <div class="sheet-head"><h2>Lyric Font</h2><button class="nav-btn" data-close>Done</button></div>
+  <div class="sheet-body">
+    <div class="sec-title">Built in</div>
+    <ul class="inset" id="fontList"></ul>
+    <div class="sec-title">From your folder</div>
+    <ul class="inset" id="fontFiles"></ul>
+    <p class="group-note" id="fontFilesEmpty">Put .ttf, .otf, .woff or .woff2 files in a “fonts” folder inside your lyrics folder, or add them below.</p>
+    <div class="btn-row"><button class="btn secondary" id="fontAdd">Add Font Files…</button></div>
+    <p class="about">Fonts load from the folder only; nothing is downloaded. A folder that travels with its fonts keeps the same look on every device.</p>
+  </div>
+</section>
+
 <section class="sheet" id="sheet_move" role="dialog" aria-label="Move to folder">
   <div class="grabber"></div>
   <div class="sheet-head"><h2 id="mvTitle">Move</h2><button class="nav-btn" data-close>Cancel</button></div>
@@ -913,6 +938,7 @@
 <div class="menu" id="menu" role="menu"></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <input type="file" id="fileAudio" accept="audio/*" multiple hidden>
+<input type="file" id="fileFonts" accept=".ttf,.otf,.woff,.woff2,font/*" multiple hidden>
 <audio id="audio" hidden></audio>
 
 <script>
@@ -986,7 +1012,7 @@ $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
    Settings
    ============================================================ */
 const DEFAULTS = {
-  theme: 'graffiti', uiStyle: 'graffiti', lyricFont: 'marker', grain: false, fontSize: 18,
+  theme: 'graffiti', uiStyle: 'graffiti', lyricFont: 'default', grain: false, fontSize: 18,
   visuals: true, intensity: 60,
   syllables: true, synizesis: true, linesPerBar: 1,
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
@@ -1330,7 +1356,7 @@ const FS = {
   async listSubdirs(dir, root) {
     const out = [];
     for await (const entry of dir.values()) {
-      if (entry.kind !== 'directory' || entry.name.startsWith('.') || (root && entry.name === 'Trash') || /^demos$/i.test(entry.name)) continue;
+      if (entry.kind !== 'directory' || entry.name.startsWith('.') || (root && entry.name === 'Trash') || /^(demos|fonts)$/i.test(entry.name)) continue;
       out.push({ name: entry.name, handle: entry, count: 0 });
     }
     return out;
@@ -1344,7 +1370,7 @@ const FS = {
     if (depth > 8 || out.length > 3000) return;
     for await (const entry of dir.values()) {
       if (entry.name.startsWith('.')) continue;
-      if (entry.kind === 'directory') { if ((depth === 0 && entry.name === 'Trash') || /^demos$/i.test(entry.name)) continue; await this.walk(entry, path.concat(entry.name), out, depth + 1); }
+      if (entry.kind === 'directory') { if ((depth === 0 && entry.name === 'Trash') || /^(demos|fonts)$/i.test(entry.name)) continue; await this.walk(entry, path.concat(entry.name), out, depth + 1); }
       else if (/\.txt$/i.test(entry.name)) {
         let f; try { f = await entry.getFile(); } catch { continue; }
         out.push({ name: entry.name, handle: entry, modified: f.lastModified, size: f.size, path, rel: path.concat(entry.name).join('/') });
@@ -1534,6 +1560,7 @@ const Sheet = {
     if (name === 'settings') syncSettingsUI();
     if (name === 'demos') Demos.refresh();
     if (name === 'rhymes') RulesUI.fill();
+    if (name === 'fonts') Fonts.renderSheet();
   },
   close() {
     if (!this.current) return;
@@ -1587,7 +1614,7 @@ const Menu = {
     const below = r.bottom + 6 + h <= innerHeight - 8;
     el.menu.style.top = `${below ? r.bottom + 6 : Math.max(8, r.top - 6 - h)}px`;
     el.menu.style.transformOrigin = below ? 'top right' : 'bottom right';
-    el.menu.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+    el.menu.style.right = `${clamp(innerWidth - r.right, 8, Math.max(8, innerWidth - 8 - 220))}px`;   // stays on screen on narrow phones
     el.menu.classList.add('show');
     setTimeout(() => document.addEventListener('pointerdown', Menu.onDoc, true), 0);
   },
@@ -3064,6 +3091,8 @@ async function enterFolder() {
   closeDoc();
   state.dir = FS.handle; state.path = [];
   await SettingsFile.load();
+  Fonts.loaded.clear();
+  Fonts.apply(true).catch(e => console.warn(e));
   const last = LS.get(lastKey(), null);
   const savedPath = LS.get(pathKey(), []);
   await navigate(typeof last === 'string' && last ? relDir(last) : (Array.isArray(savedPath) ? savedPath : []));
@@ -3645,6 +3674,97 @@ el.btnMusicFolder.addEventListener('click', async () => {
   if (i === 0) Beats.pick();
 });
 
+/* ============================================================
+   Lyric font: built-in faces or font files from a “fonts” folder inside the lyrics folder (loaded from disk, never downloaded)
+   ============================================================ */
+const FONT_STACKS = {
+  marker: '"Marker Felt", "Segoe Print", "Bradley Hand", "Chalkboard SE", "Comic Sans MS", cursive',
+  stencil: '"Bahnschrift", "Bahnschrift SemiCondensed", "AvenirNextCondensed-Medium", "Avenir Next Condensed", "Franklin Gothic Medium", "Trebuchet MS", "Arial Narrow", sans-serif',
+  block: 'Impact, "Arial Black", "AvenirNextCondensed-Heavy", "HelveticaNeue-CondensedBlack", "Franklin Gothic Heavy", sans-serif',
+  typewriter: '"American Typewriter", "Courier New", Menlo, Consolas, monospace',
+  serif: 'Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif',
+  plain: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+};
+const FONT_LABELS = { default: 'Style default', marker: 'Marker', stencil: 'Stencil', block: 'Block letters', typewriter: 'Typewriter', serif: 'Serif', plain: 'Plain' };
+const FONT_SAMPLE = 'Aa Bb Cc · Αα Ββ Γγ · 0123';
+const Fonts = {
+  loaded: new Map(),   // file name → CSS family name
+  isFontName: n => /\.(ttf|otf|woff2?)$/i.test(n),
+  async dir(create) { try { return FS.handle ? await FS.handle.getDirectoryHandle('fonts', { create: !!create }) : null; } catch { return null; } },
+  async list() {
+    const dir = await this.dir(false), out = [];
+    if (!dir) return out;
+    try { for await (const e of dir.values()) if (e.kind === 'file' && this.isFontName(e.name)) out.push({ name: e.name, handle: e }); } catch (e) { console.warn(e); }
+    return out.sort((a, b) => collator.compare(a.name, b.name));
+  },
+  family(fileName) { return `Lyric Font ${fileName.replace(/\.[^.]+$/, '').replace(/["\\]/g, '')}`; },
+  async load(entry) {
+    if (this.loaded.has(entry.name)) return this.loaded.get(entry.name);
+    const buf = await (await entry.handle.getFile()).arrayBuffer();
+    const fam = this.family(entry.name), face = new FontFace(fam, buf);
+    await face.load(); document.fonts.add(face);
+    this.loaded.set(entry.name, fam);
+    return fam;
+  },
+  label(id) { return id && id.startsWith('file:') ? id.slice(5).replace(/\.[^.]+$/, '') : (FONT_LABELS[id] || FONT_LABELS.default); },
+  stack(id) {
+    if (id && id.startsWith('file:')) { const fam = this.loaded.get(id.slice(5)); return fam ? `"${fam}", ${FONT_STACKS.plain}` : null; }
+    return FONT_STACKS[id] || null;
+  },
+  // Apply the chosen lyric font; a missing file falls back to the style's default and says so.
+  async apply(silent) {
+    const id = settings.lyricFont || 'default';
+    let stack = null;
+    if (id.startsWith('file:')) {
+      const name = id.slice(5);
+      if (!this.loaded.has(name) && FS.handle) {
+        const entry = (await this.list()).find(f => f.name === name);
+        if (entry) { try { await this.load(entry); } catch (e) { console.warn(e); if (!silent) toast(`Could not load the font “${name}”`, 3000); } }
+        else if (!silent) toast(`“${name}” is not in this folder’s fonts folder`, 3000);
+      }
+      stack = this.stack(id);
+    } else if (id !== 'default') stack = FONT_STACKS[id] || null;
+    const root = document.documentElement.style;
+    if (stack) root.setProperty('--font-lyric', stack); else root.removeProperty('--font-lyric');
+    el.setLyricFont.textContent = this.label(id);
+    queueRender(); if (state.doc && !state.editing) renderReader();
+  },
+  async addFiles(files) {
+    const list = Array.from(files || []).filter(f => this.isFontName(f.name));
+    if (!list.length) { toast('Choose .ttf, .otf, .woff or .woff2 files', 2400); return; }
+    const dir = await this.dir(true);
+    if (!dir) { toast('Choose a folder first; fonts are kept in it', 2600); return; }
+    let n = 0;
+    for (const f of list) {
+      try {
+        const h = await dir.getFileHandle(f.name, { create: true }), w = await h.createWritable();
+        try { await w.write(await f.arrayBuffer()); await w.close(); n++; } catch (e) { try { await w.abort(); } catch { /* ignore */ } throw e; }
+      } catch (e) { console.warn(e); }
+    }
+    toast(`Added ${plural(n, 'font')} to the fonts folder`, 2000);
+    await this.renderSheet();
+  },
+  async renderSheet() {
+    const cur = settings.lyricFont || 'default';
+    const row = (id, label, stack, sub) => `<li class="cell font-cell${id === cur ? ' active' : ''}" data-font="${esc(id)}" role="button" tabindex="0"><div class="txt"><div class="ttl" style="font-family:${esc(stack)}">${esc(label)}</div><div class="sub" style="font-family:${esc(stack)}">${esc(sub || FONT_SAMPLE)}</div></div>${id === cur ? `<span class="ico">${ICONS.check}</span>` : ''}</li>`;
+    const styleDefault = settings.uiStyle === 'ios' ? FONT_STACKS.plain : FONT_STACKS.marker;
+    el.fontList.innerHTML = [row('default', 'Style default', styleDefault, settings.uiStyle === 'ios' ? 'The system font of the iPhone style' : 'The marker hand of the graffiti style')]
+      .concat(Object.keys(FONT_STACKS).map(id => row(id, FONT_LABELS[id], FONT_STACKS[id]))).join('');
+    const files = await this.list();
+    for (const f of files) { try { await this.load(f); } catch (e) { console.warn(e); } }
+    el.fontFiles.innerHTML = files.map(f => { const fam = this.loaded.get(f.name); return row(`file:${f.name}`, f.name.replace(/\.[^.]+$/, ''), fam ? `"${fam}", ${FONT_STACKS.plain}` : FONT_STACKS.plain, fam ? FONT_SAMPLE : 'This file could not be read as a font'); }).join('');
+    el.fontFilesEmpty.hidden = files.length > 0;
+    el.fontAdd.disabled = !FS.handle;
+  },
+};
+el.setLyricFont.addEventListener('click', () => Sheet.open('fonts'));
+el.sheet_fonts.addEventListener('click', e => {
+  const c = e.target.closest('.font-cell'); if (!c) return;
+  setSetting('lyricFont', c.dataset.font); Fonts.renderSheet();
+});
+el.fontAdd.addEventListener('click', () => el.fileFonts.click());
+el.fileFonts.addEventListener('change', () => { Fonts.addFiles(el.fileFonts.files); el.fileFonts.value = ''; });
+
 let volumeBeforeMute = 100;
 function setVolume(v, fromSlider) {
   settings.volume = clamp(Math.round(v), 0, 100); saveSettings();
@@ -3919,6 +4039,7 @@ function syncSettingsUI() {
   $$('input[type="range"][data-setting]').forEach(r => { r.value = String(settings[r.dataset.setting]); });
   $$('.swatch', el.swatches).forEach(s => s.setAttribute('aria-pressed', String(s.dataset.theme === settings.theme)));
   el.setFolderName.textContent = FS.handle ? FS.handle.name : 'Not chosen yet';
+  el.setLyricFont.textContent = Fonts.label(settings.lyricFont || 'default');
 }
 function setSetting(key, value) { settings[key] = value; saveSettings(); onSettingChange(key); }
 function onSettingChange(key) {
@@ -3934,7 +4055,8 @@ function onSettingChange(key) {
     case 'metroBpm': case 'metroSub': case 'metroAccent': case 'metroVol': Metro.render(); break;
     case 'beatsPerLine': AutoScroll.render(); break;
     case 'takeFormat': Demos.render(); break;
-    case 'uiStyle': case 'lyricFont': applyStyle(); Wave.updateColors(); Wave.draw(true); queueRender(); if (state.doc && !state.editing) renderReader(); break;
+    case 'uiStyle': applyStyle(); Wave.updateColors(); Wave.draw(true); Fonts.apply(true); break;
+    case 'lyricFont': Fonts.apply(false); break;
     case 'sort': sortFiles(); renderList(); break;
     default: break;
   }
@@ -5022,10 +5144,7 @@ function applyEditorSize() {
   root.setProperty('--editor-size', `${size}px`);
   root.setProperty('--editor-line', `${Math.round(size * 1.55)}px`);
 }
-function applyStyle() {
-  document.documentElement.dataset.style = settings.uiStyle === 'ios' ? 'ios' : 'graffiti';
-  document.documentElement.dataset.lyricFont = ['marker', 'stencil', 'plain'].includes(settings.lyricFont) ? settings.lyricFont : 'marker';
-}
+function applyStyle() { document.documentElement.dataset.style = settings.uiStyle === 'ios' ? 'ios' : 'graffiti'; }
 function applyInitialSettings() {
   const root = document.documentElement.style;
   applyStyle();
