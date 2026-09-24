@@ -80,7 +80,6 @@
   .cell-more svg { width: 18px; height: 18px; }
   .cell:hover .cell-more { color: var(--accent); }
   .cell.active .cell-more { color: inherit; }
-  .cell[draggable="true"] { -webkit-user-drag: element; }
   .large-title { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0; line-height: 1.1; }
   .search { margin: 8px 16px 12px; display: flex; align-items: center; gap: 6px; background: var(--fill-2); border-radius: 10px; padding: 7px 10px; color: var(--label-2); }
   .search input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; color: var(--label); font: inherit; font-size: 17px; }
@@ -304,6 +303,13 @@
   .tb-loop-label { font-size: 11px; font-weight: 700; letter-spacing: .02em; }
   .tb-loop-label:empty { display: none; }
   .tb-ab { font-weight: 700; font-size: 13px; letter-spacing: .04em; min-width: 34px; }
+  .tb-ab-clear { min-width: 28px; padding: 0 4px; color: var(--label-2); }
+  .tb-ab-clear svg { width: 16px; height: 16px; }
+  .tb-more { display: none; }
+  .group-hint { font-size: 11px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--label-3); }
+  /* Press-and-drag reordering (hold on touch) */
+  .drag-ghost { position: fixed; z-index: 100; pointer-events: none; opacity: .92; transform: scale(1.03) rotate(-1deg); box-shadow: 0 12px 30px rgba(0,0,0,.4); border-radius: 10px; background: var(--bg-3); list-style: none; margin: 0; }
+  .cell.dragging { opacity: .3; }
   .tb-seg { padding: 2px; flex: none; }
   .tb-seg button { padding: 5px 8px; display: inline-flex; align-items: center; color: var(--label-2); }
   .tb-seg button[aria-pressed="true"] { color: var(--accent); }
@@ -555,8 +561,9 @@
     .app[data-view="list"] .detail { display: none; }
     .nav-btn.back { display: inline-flex; }
     .side-toggle { display: none; }
-    .tb-track { max-width: 90px; }
-    #tbTap { display: none; }
+    /* Phone toolbar: play, record, previous, next, loop, helpers and settings; everything else lives in the arrow's Controls sheet */
+    #tbTrack, #tbDir, #tbAB, #tbABClear, #tbMetro, #tbTap { display: none; }
+    .tb-more { display: inline-flex; }
     .tb-btn { min-width: 34px; padding: 0 6px; }
     .doc-inner { padding: 20px 16px 45vh; }
     .wave-vol input[type="range"] { width: 64px; }
@@ -566,9 +573,7 @@
   @media (max-width: 480px) {
     .large-title { font-size: 30px; }
     .counts { display: none; }
-    #tbAB, #tbHelpers { display: none; }
     .tb-btn { min-width: 32px; padding: 0 4px; }
-    .tb-track { max-width: 72px; }
     .tb-group { gap: 0; }
     .nav { padding: 0 6px; gap: 4px; }
     .nav-btn { padding: 6px 5px; font-size: 16px; }
@@ -616,14 +621,14 @@
     <div class="seg side-seg" id="sideMode"><button data-mode="lyrics" aria-pressed="true">Lyrics</button><button data-mode="music" aria-pressed="false">Music</button></div>
     <label class="search"><span class="ico" data-icon="search"></span><input id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search"></label>
     <div class="list-scroll" id="musicScroll" hidden>
-      <section class="group" id="musicPlaylistGroup" hidden>
-        <div class="group-head static"><span>Playlist</span></div>
-        <ul class="inset" id="musicPlaylist"></ul>
-      </section>
       <section class="group">
         <ul class="inset" id="musicList"></ul>
         <p class="group-note" id="musicEmpty" hidden></p>
         <div class="btn-row" id="musicActions" hidden><button class="btn secondary" id="musicChoose">Choose Music Folder…</button></div>
+      </section>
+      <section class="group" id="musicPlaylistGroup" hidden>
+        <div class="group-head static"><span>Playlist</span><span class="group-hint">hold and drag to reorder</span></div>
+        <ul class="inset" id="musicPlaylist"></ul>
       </section>
       <section class="group" id="musicTakesGroup" hidden>
         <div class="group-head static"><span id="musicTakesTitle">Takes</span></div>
@@ -705,8 +710,10 @@
         <button class="tb-btn tb-track" id="tbTrack" title="Beat player"><span>No beat</span></button>
         <button class="tb-btn" id="tbLoop" aria-pressed="false" aria-label="Loop mode (Alt+L)" title="Loop mode (Alt+L)"><span data-icon="repeat"></span><span class="tb-loop-label" id="tbLoopLabel"></span></button>
         <button class="tb-btn tb-ab" id="tbAB" aria-pressed="false" aria-label="Set loop points" title="Press to set A, again to set B">A</button>
+        <button class="tb-btn tb-ab-clear" id="tbABClear" aria-label="Clear loop points (Alt+Shift+L)" title="Clear loop points" hidden><span data-icon="xmark"></span></button>
       </div>
       <div class="tb-group">
+        <button class="tb-btn tb-more" id="tbMore" aria-label="More controls" title="More controls"><span data-icon="chevUp"></span></button>
         <button class="tb-btn" id="tbMetro" aria-pressed="false" aria-label="Metronome (Alt+M)"><span data-icon="metro"></span><span id="tbBpm">90</span></button>
         <button class="tb-btn" id="tbTap" title="Tap tempo (Alt+T)">Tap</button>
       </div>
@@ -785,7 +792,7 @@
 
     <div class="sec-title">Files</div>
     <div class="inset">
-      <div class="row"><div class="lbl">Sort</div><div class="ctl"><div class="seg" data-setting="sort"><button data-value="modified">Recent</button><button data-value="name">Name</button></div></div></div>
+      <div class="row"><div><div class="lbl">Sort</div><div class="desc">Custom follows the order you drag lyrics into</div></div><div class="ctl"><div class="seg" data-setting="sort"><button data-value="modified">Recent</button><button data-value="name">Name</button><button data-value="manual">Custom</button></div></div></div>
       <div class="row"><div><div class="lbl">Folder</div><div class="desc" id="setFolderName"></div></div><div class="ctl"><button class="small-btn" id="setChangeFolder">Change…</button></div></div>
     </div>
 
@@ -907,6 +914,23 @@
   </div>
 </section>
 
+<section class="sheet" id="sheet_more" role="dialog" aria-label="More controls">
+  <div class="grabber"></div>
+  <div class="sheet-head"><h2>Controls</h2><button class="nav-btn" data-close>Done</button></div>
+  <div class="sheet-body">
+    <ul class="inset"><li class="cell" id="moreTrack" role="button" tabindex="0"><span class="ico" data-icon="music"></span><div class="txt"><div class="ttl" id="moreTrackName">No beat</div><div class="sub">Open the beat player</div></div><span class="ico chev" data-icon="chev"></span></li></ul>
+    <div class="inset">
+      <div class="row"><div><div class="lbl">List</div><div class="desc">What Previous and Next walk through</div></div><div class="ctl"><div class="seg" id="moreDir"><button data-dir="beats">Beats</button><button data-dir="demos">Demos</button></div></div></div>
+      <div class="row"><div><div class="lbl">Loop points</div><div class="desc" id="moreLoopDesc"></div></div><div class="ctl"><button class="small-btn" id="moreA">A</button><button class="small-btn" id="moreB">B</button><button class="small-btn" id="moreClear">Clear</button></div></div>
+      <div class="row"><div class="lbl">Loop</div><div class="ctl"><div class="seg" id="moreLoopMode"><button data-mode="off">Off</button><button data-mode="ab">A–B</button><button data-mode="track">Track</button><button data-mode="folder">Folder</button></div></div></div>
+    </div>
+    <div class="inset">
+      <div class="row"><div><div class="lbl">Metronome</div><div class="desc" id="moreMetroDesc"></div></div><div class="ctl"><button class="switch" role="switch" id="moreMetro" aria-checked="false" aria-label="Metronome"></button></div></div>
+      <div class="row"><div class="lbl">Tempo</div><div class="ctl"><div class="stepper" data-setting="metroBpm" data-min="40" data-max="240"><button data-step="-1" aria-label="Slower">−</button><span class="val"></span><button data-step="1" aria-label="Faster">+</button></div><button class="small-btn" id="moreTap">Tap</button></div></div>
+    </div>
+  </div>
+</section>
+
 <section class="sheet" id="sheet_fonts" role="dialog" aria-label="Lyric font">
   <div class="grabber"></div>
   <div class="sheet-head"><h2>Lyric Font</h2><button class="nav-btn" data-close>Done</button></div>
@@ -981,7 +1005,8 @@ const ICONS = {
   next: '<svg viewBox="0 0 24 24"><path d="M5 5.5v13l9.5-6.5zM16.5 5.5H19v13h-2.5z" fill="currentColor" stroke="none"/></svg>',
   prev: '<svg viewBox="0 0 24 24"><path d="M19 5.5v13L9.5 12zM5 5.5h2.5v13H5z" fill="currentColor" stroke="none"/></svg>',
   metro: '<svg viewBox="0 0 24 24"><path d="M9.5 3.5h5l2.8 16.5H6.7z"/><path d="M12 14.5 17.5 6.5"/><circle cx="12" cy="14.5" r="1.3" fill="currentColor" stroke="none"/></svg>',
-  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M2.8 12h2.7M18.5 12h2.7M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9"/></svg>',
+  gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13.4a7.6 7.6 0 0 0 0-2.8l2-1.5-2-3.4-2.3.9a7.7 7.7 0 0 0-2.5-1.5L14.2 2.6H9.8l-.4 2.5a7.7 7.7 0 0 0-2.5 1.5l-2.3-.9-2 3.4 2 1.5a7.6 7.6 0 0 0 0 2.8l-2 1.5 2 3.4 2.3-.9a7.7 7.7 0 0 0 2.5 1.5l.4 2.5h4.4l.4-2.5a7.7 7.7 0 0 0 2.5-1.5l2.3.9 2-3.4z"/></svg>',
+  chevUp: '<svg viewBox="0 0 24 24"><path d="M5.5 15l6.5-6.5 6.5 6.5"/></svg>',
   back: '<svg viewBox="0 0 24 24"><path d="M15 5.5 8.5 12l6.5 6.5"/></svg>',
   chev: '<svg viewBox="0 0 24 24"><path d="M9 5.5l6.5 6.5L9 18.5"/></svg>',
   search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>',
@@ -1561,6 +1586,7 @@ const Sheet = {
     if (name === 'demos') Demos.refresh();
     if (name === 'rhymes') RulesUI.fill();
     if (name === 'fonts') Fonts.renderSheet();
+    if (name === 'more') renderMore();
   },
   close() {
     if (!this.current) return;
@@ -2203,6 +2229,8 @@ const Player = {
     el.tbAB.textContent = this.loopA == null ? 'A' : this.loopB == null ? 'B' : 'AB';
     el.tbAB.setAttribute('aria-pressed', String(hasLoop));
     el.tbAB.title = this.loopA == null ? 'Press to set A at the current position' : this.loopB == null ? `A ${fmtTime(this.loopA)} · press to set B` : `Loop ${fmtTime(this.loopA)} – ${fmtTime(this.loopB)} · press to start a new one`;
+    el.tbABClear.hidden = this.loopA == null;
+    if (Sheet.current === el.sheet_more) renderMore();
     el.plCapture.textContent = Sound.capturing ? 'Stop Capture' : 'Capture System Audio';
     const pool = this.pool();
     el.plList.innerHTML = pool.map(i => {
@@ -2234,6 +2262,15 @@ const Player = {
     this.items.splice(i, 1);
     if (it.kind === 'yt') this.saveLinks();
     this.render(); Wave.draw(true);
+  },
+  // New order for the hand-added files and links (indices as rendered); folder tracks and takes keep their place.
+  reorderExtras(order) {
+    const cur = this.current();
+    const extras = order.map(i => this.items[i]).filter(Boolean);
+    const rest = this.items.filter(it => !extras.includes(it));
+    this.items = extras.concat(rest);
+    this.idx = cur ? this.items.indexOf(cur) : -1;
+    this.saveLinks(); this.render();
   },
   renderTime() { Wave.draw(); },
 };
@@ -2344,7 +2381,7 @@ const Metro = {
     if (this.on && Sound.ctx) { this.next = Sound.ctx.currentTime + .02; this.start0 = this.next; this.beat = 0; }
     toast(`${bpm} BPM`, 1200);
   },
-  render() { el.tbBpm.textContent = String(this.bpm); el.tbMetro.setAttribute('aria-pressed', String(this.on)); AutoScroll.render(); },
+  render() { el.tbBpm.textContent = String(this.bpm); el.tbMetro.setAttribute('aria-pressed', String(this.on)); AutoScroll.render(); if (Sheet.current === el.sheet_more) renderMore(); },
 };
 el.tbMetro.addEventListener('click', () => Metro.toggle());
 el.tbTap.addEventListener('click', () => Metro.tap());
@@ -2669,7 +2706,7 @@ const markStyle = c => (c >= 0 ? ` style="--tint:${TINTS[c % 8]}"` : '');
 /* ============================================================
    Application state
    ============================================================ */
-const state = { files: [], folders: [], trash: [], path: [], dir: null, tree: null, dragRel: null, doc: null, picks: [], sideMode: 'lyrics', editing: true, filter: '', paused: false, trashOpen: false, snippets: new Map(), queues: new Map() };
+const state = { files: [], folders: [], trash: [], path: [], dir: null, tree: null, doc: null, picks: [], sideMode: 'lyrics', editing: true, filter: '', paused: false, trashOpen: false, snippets: new Map(), queues: new Map() };
 const stem = n => n.replace(/\.txt$/i, '');
 const channel = 'BroadcastChannel' in window ? new BroadcastChannel('lyrics-studio') : null;
 const broadcast = msg => { if (channel && FS.folderId) channel.postMessage(Object.assign({ folderId: FS.folderId, tab: TAB_ID }, msg)); };
@@ -2925,10 +2962,21 @@ function validFolderName(raw) {
   if (/[. ]$/.test(n) || /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i.test(n) || (isRoot() && n.toLowerCase() === 'trash')) return null;
   return n;
 }
+const orderKey = () => `lyr:order:${FS.folderId}:${state.path.join('/')}`;
 function sortFiles() {
   state.folders.sort((a, b) => collator.compare(a.name, b.name));
   if (settings.sort === 'name') state.files.sort((a, b) => collator.compare(a.name, b.name));
-  else state.files.sort((a, b) => b.modified - a.modified);
+  else if (settings.sort === 'manual') {
+    const order = LS.get(orderKey(), []) || [], idx = new Map(order.map((n, i) => [n, i]));
+    const rank = f => (idx.has(f.name) ? idx.get(f.name) : Infinity);
+    state.files.sort((a, b) => (rank(a) - rank(b)) || (b.modified - a.modified));
+  } else state.files.sort((a, b) => b.modified - a.modified);
+}
+// A dragged order is remembered per folder and switches Sort to Custom.
+function saveManualOrder(names) {
+  LS.set(orderKey(), names);
+  if (settings.sort !== 'manual') { settings.sort = 'manual'; saveSettings(); syncSettingsUI(); toast('Custom order · Settings › Files › Sort switches back', 2400); }
+  sortFiles(); renderList();
 }
 async function loadSnippets() {
   for (const f of state.files) {
@@ -2984,7 +3032,7 @@ function renderList() {
   const q = state.filter.trim().toLowerCase();
   if (state.sideMode !== 'music') renderCrumbs('lyrics');
   const snip = rel => (state.snippets.get(rel) || {}).text || '';
-  const fileCell = (f, sub) => `<li class="cell${state.doc && state.doc.rel === f.rel ? ' active' : ''}" data-rel="${esc(f.rel)}" role="button" tabindex="0" draggable="true"><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>${esc(sub)}</div></div></li>`;
+  const fileCell = (f, sub) => `<li class="cell${state.doc && state.doc.rel === f.rel ? ' active' : ''}" data-rel="${esc(f.rel)}" role="button" tabindex="0"><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>${esc(sub)}</div></div></li>`;
   if (q) {
     const hits = (state.tree || []).filter(f => stem(f.name).toLowerCase().includes(q) || snip(f.rel).toLowerCase().includes(q));
     el.fileList.innerHTML = hits.map(f => fileCell(f, pathLabel(f.path))).join('');
@@ -4062,25 +4110,56 @@ function onSettingChange(key) {
   }
   syncSettingsUI();
 }
-el.sheet_settings.addEventListener('click', e => {
-  const sw = e.target.closest('.switch[data-setting]');
-  if (sw) { setSetting(sw.dataset.setting, !settings[sw.dataset.setting]); return; }
-  const segBtn = e.target.closest('.seg[data-setting] button');
-  if (segBtn) {
-    const key = segBtn.closest('.seg').dataset.setting, raw = segBtn.dataset.value;
-    setSetting(key, typeof DEFAULTS[key] === 'number' ? Number(raw) : raw);
-    return;
-  }
-  const stepBtn = e.target.closest('.stepper[data-setting] button');
-  if (stepBtn) {
-    const s = stepBtn.closest('.stepper'), key = s.dataset.setting;
-    setSetting(key, clamp((Number(settings[key]) || 0) + Number(stepBtn.dataset.step), Number(s.dataset.min), Number(s.dataset.max)));
-  }
-});
-el.sheet_settings.addEventListener('input', e => {
-  const r = e.target.closest('input[type="range"][data-setting]');
-  if (r) setSetting(r.dataset.setting, Number(r.value));
-});
+// Any sheet with data-setting controls (switches, segments, steppers, sliders) binds through here.
+function bindSettingControls(root) {
+  root.addEventListener('click', e => {
+    const sw = e.target.closest('.switch[data-setting]');
+    if (sw) { setSetting(sw.dataset.setting, !settings[sw.dataset.setting]); return; }
+    const segBtn = e.target.closest('.seg[data-setting] button');
+    if (segBtn) {
+      const key = segBtn.closest('.seg').dataset.setting, raw = segBtn.dataset.value;
+      setSetting(key, typeof DEFAULTS[key] === 'number' ? Number(raw) : raw);
+      return;
+    }
+    const stepBtn = e.target.closest('.stepper[data-setting] button');
+    if (stepBtn) {
+      const s = stepBtn.closest('.stepper'), key = s.dataset.setting;
+      setSetting(key, clamp((Number(settings[key]) || 0) + Number(stepBtn.dataset.step), Number(s.dataset.min), Number(s.dataset.max)));
+    }
+  });
+  root.addEventListener('input', e => {
+    const r = e.target.closest('input[type="range"][data-setting]');
+    if (r) setSetting(r.dataset.setting, Number(r.value));
+  });
+}
+bindSettingControls(el.sheet_settings);
+bindSettingControls(el.sheet_more);
+
+/* Phone-only Controls sheet (the arrow in the toolbar): the controls that do not fit a narrow toolbar. */
+function renderMore() {
+  const it = Player.current(), hasLoop = Player.loopA != null && Player.loopB != null;
+  el.moreTrackName.textContent = Sound.capturing ? 'System audio' : it ? it.name : 'No beat';
+  $$('button', el.moreDir).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.dir === Player.dirMode)));
+  el.moreLoopDesc.textContent = Player.loopA == null ? 'Set A, then B' : Player.loopB == null ? `A ${fmtTime(Player.loopA)} · now set B` : `${fmtTime(Player.loopA)} – ${fmtTime(Player.loopB)}`;
+  el.moreA.setAttribute('aria-pressed', String(Player.loopA != null));
+  el.moreB.setAttribute('aria-pressed', String(Player.loopB != null));
+  el.moreClear.disabled = Player.loopA == null;
+  $$('button', el.moreLoopMode).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === Player.loopMode)));
+  el.moreMetro.setAttribute('aria-checked', String(Metro.on));
+  el.moreMetroDesc.textContent = `${settings.metroBpm} BPM · ${settings.metroSub === 2 ? 'eighths' : 'quarters'}${hasLoop ? '' : ''}`;
+  syncSettingsUI();
+}
+el.tbMore.addEventListener('click', () => Sheet.open('more'));
+el.tbABClear.addEventListener('click', () => Player.clearLoop());
+el.moreTrack.addEventListener('click', () => Sheet.open('player'));
+el.moreDir.addEventListener('click', e => { const b = e.target.closest('button[data-dir]'); if (b) Player.setDir(b.dataset.dir); });
+el.moreA.addEventListener('click', () => Player.setA());
+el.moreB.addEventListener('click', () => Player.setB());
+el.moreClear.addEventListener('click', () => Player.clearLoop());
+el.moreLoopMode.addEventListener('click', e => { const b = e.target.closest('button[data-mode]'); if (b) Player.setMode(b.dataset.mode, true); });
+el.moreMetro.addEventListener('click', () => Metro.toggle());
+el.moreTap.addEventListener('click', () => Metro.tap());
+bindWheelControls(el.sheet_more);
 el.setChangeFolder.addEventListener('click', async () => { Sheet.close(); saveDraftNow(); await flushSave(); await chooseFolder(); });
 
 /* ============================================================
@@ -4147,30 +4226,89 @@ el.crumbPath.addEventListener('click', e => {
   const n = +b.dataset.crumb;
   if (state.sideMode === 'music') Music.navigate(Music.path.slice(0, n)); else navigate(state.path.slice(0, n));
 });
-// Drag a lyric onto a folder (or onto the back button) to move it there.
-el.fileList.addEventListener('dragstart', e => {
-  const c = e.target.closest('.cell[data-rel]'); if (!c) return;
-  state.dragRel = c.dataset.rel;
-  try { e.dataTransfer.setData('text/plain', c.dataset.rel); e.dataTransfer.effectAllowed = 'move'; } catch { /* ignore */ }
+/* Press-and-drag for lists: a mouse drags at once, a finger holds for a moment first. Dragging within the
+   list reorders it live; dragging a lyric onto a folder, a crumb or the back button moves it there. */
+const DragList = {
+  active: null, holdTimer: null, suppressUntil: 0,
+  attach(container, cfg) {
+    container.addEventListener('pointerdown', e => this.down(e, container, cfg));
+    container.addEventListener('touchmove', e => { if (this.active && this.active.container === container) e.preventDefault(); }, { passive: false });
+  },
+  down(e, container, cfg) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.target.closest('button, input, a, textarea')) return;
+    const item = e.target.closest(cfg.itemSel); if (!item || !container.contains(item)) return;
+    const canReorder = cfg.canReorder ? cfg.canReorder(item) : true;
+    if (!canReorder && !cfg.targetSel) return;
+    const st = { container, cfg, item, canReorder, pointerId: e.pointerId, x0: e.clientX, y0: e.clientY, started: false, moved: false, target: null, ghost: null };
+    const onMove = ev => {
+      if (ev.pointerId !== st.pointerId) return;
+      if (!st.started) {
+        if (Math.hypot(ev.clientX - st.x0, ev.clientY - st.y0) > 8) { if (e.pointerType === 'mouse') this.begin(st, ev); else cleanup(); }   // a finger that moves early is scrolling
+        return;
+      }
+      this.move(st, ev);
+    };
+    const onUp = ev => { if (ev.pointerId !== st.pointerId) return; cleanup(); if (st.started) this.end(st); };
+    const cleanup = () => { clearTimeout(this.holdTimer); this.holdTimer = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onUp); };
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onUp);
+    if (e.pointerType !== 'mouse') { clearTimeout(this.holdTimer); this.holdTimer = setTimeout(() => this.begin(st, e), 380); }
+  },
+  begin(st, ev) {
+    if (st.started) return;
+    st.started = true; this.active = st;
+    const r = st.item.getBoundingClientRect();
+    st.item.classList.add('dragging');
+    const g = st.item.cloneNode(true);
+    g.classList.add('drag-ghost'); g.classList.remove('dragging', 'active');
+    g.style.width = `${r.width}px`; g.style.left = `${r.left}px`; g.style.top = `${r.top}px`;
+    document.body.appendChild(g);
+    st.ghost = g; st.offX = ev.clientX - r.left; st.offY = ev.clientY - r.top;
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch { /* ignore */ } }
+    this.move(st, ev);
+  },
+  move(st, ev) {
+    st.ghost.style.left = `${ev.clientX - st.offX}px`; st.ghost.style.top = `${ev.clientY - st.offY}px`;
+    const under = document.elementFromPoint(ev.clientX, ev.clientY);
+    $$('.drop').forEach(x => x.classList.remove('drop'));
+    const target = st.cfg.targetSel && under ? under.closest(st.cfg.targetSel) : null;
+    if (target && target !== st.item) { target.classList.add('drop'); st.target = target; return; }
+    st.target = null;
+    if (st.canReorder) {
+      const sib = under ? under.closest(st.cfg.itemSel) : null;
+      if (sib && sib !== st.item && sib.parentNode === st.item.parentNode && (!st.cfg.canReorder || st.cfg.canReorder(sib))) {
+        const r = sib.getBoundingClientRect();
+        sib.parentNode.insertBefore(st.item, ev.clientY < r.top + r.height / 2 ? sib : sib.nextSibling);
+        st.moved = true;
+      }
+    }
+    const sc = st.cfg.scroller || st.container, cr = sc.getBoundingClientRect();
+    if (ev.clientY < cr.top + 44) sc.scrollTop -= 10; else if (ev.clientY > cr.bottom - 44) sc.scrollTop += 10;
+  },
+  end(st) {
+    this.active = null;
+    st.item.classList.remove('dragging');
+    if (st.ghost) st.ghost.remove();
+    $$('.drop').forEach(x => x.classList.remove('drop'));
+    this.suppressUntil = Date.now() + 400;   // the release must not count as a tap on the row
+    if (st.target) { if (st.cfg.onDropTarget) st.cfg.onDropTarget(st.item, st.target); return; }
+    if (st.moved && st.cfg.onReorder) st.cfg.onReorder(Array.from(st.item.parentNode.querySelectorAll(st.cfg.itemSel)));
+  },
+};
+document.addEventListener('click', e => { if (Date.now() < DragList.suppressUntil) { e.stopPropagation(); e.preventDefault(); } }, true);
+DragList.attach(el.fileList, {
+  itemSel: '.cell[data-rel]', scroller: el.listScroll,
+  canReorder: () => !state.filter.trim(),
+  targetSel: '.cell.folder, #btnUp:not(:disabled), .crumb:not(.current)',
+  onDropTarget: (item, t) => {
+    const dest = t.id === 'btnUp' ? state.path.slice(0, -1) : t.dataset.crumb != null ? state.path.slice(0, +t.dataset.crumb) : state.path.concat(t.dataset.dir);
+    moveFile(item.dataset.rel, dest);
+  },
+  onReorder: items => saveManualOrder(items.map(x => relName(x.dataset.rel))),
 });
-el.fileList.addEventListener('dragend', () => { state.dragRel = null; $$('.drop', el.sidebar).forEach(x => x.classList.remove('drop')); });
-const dropTarget = e => (state.sideMode === 'music' ? null : e.target.closest('.cell.folder, #btnUp, .crumb:not(.current)'));
-el.sidebar.addEventListener('dragover', e => {
-  if (!state.dragRel) return;
-  const t = dropTarget(e); if (!t) return;
-  e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-  $$('.drop', el.sidebar).forEach(x => { if (x !== t) x.classList.remove('drop'); });
-  t.classList.add('drop');
-});
-el.sidebar.addEventListener('dragleave', e => { const t = dropTarget(e); if (t && !t.contains(e.relatedTarget)) t.classList.remove('drop'); });
-el.sidebar.addEventListener('drop', e => {
-  if (!state.dragRel) return;
-  const t = dropTarget(e); if (!t) return;
-  e.preventDefault(); e.stopPropagation();
-  t.classList.remove('drop');
-  const rel = state.dragRel; state.dragRel = null;
-  const dest = t.id === 'btnUp' ? state.path.slice(0, -1) : t.dataset.crumb != null ? state.path.slice(0, +t.dataset.crumb) : state.path.concat(t.dataset.dir);
-  moveFile(rel, dest);
+DragList.attach(el.musicPlaylist, {
+  itemSel: '.cell[data-mitem]', scroller: el.musicScroll,
+  onReorder: items => Player.reorderExtras(items.map(x => +x.dataset.mitem)),
 });
 el.trashList.addEventListener('click', e => { const c = e.target.closest('.cell'); if (c) trashActions(c.dataset.trash); });
 el.trashList.addEventListener('keydown', e => {
@@ -4232,6 +4370,7 @@ el.tbHelpers.addEventListener('click', () => {
     { label: 'Rhymes', icon: chk(settings.rhymes), onClick: () => setSetting('rhymes', !settings.rhymes) },
     { label: 'Internal rhymes', icon: chk(settings.internalRhymes), onClick: () => setSetting('internalRhymes', !settings.internalRhymes) },
     { label: 'Rhyme rules…', icon: 'wave', onClick: () => Sheet.open('rhymes') },
+    { label: `Lyric font · ${Fonts.label(settings.lyricFont || 'default')}`, icon: 'text', onClick: () => Sheet.open('fonts') },
     { label: Picker.mode ? 'Exit pick mode' : 'Pick rhymes to connect', icon: Picker.mode ? 'xmark' : 'plus', onClick: () => Picker.toggleMode() },
     ...(state.doc && state.doc.rhymesOff ? [{ label: 'Restore automatic rhymes here', icon: 'restore', onClick: () => el.manualAuto.click() }] : []),
     { label: state.editing ? 'Reading view' : 'Edit', icon: state.editing ? 'doc' : 'pencil', onClick: () => { if (state.doc) setEditing(!state.editing); } },
