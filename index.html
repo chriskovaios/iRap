@@ -405,6 +405,12 @@
   .tr-btn.big { width: 64px; height: 64px; background: var(--accent); color: var(--on-accent); }
   .tr-btn.big svg { width: 32px; height: 32px; }
   .pl-cell .ttl { font-weight: 500; }
+  /* Long lists: the list scrolls on its own so the controls around it stay reachable */
+  .scroll-list { max-height: min(44vh, 380px); overflow-y: auto; scrollbar-width: thin; }
+  .list-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 2px 0 8px; }
+  .search.compact { margin: 0 0 10px; }
+  .sec-title-row { display: flex; align-items: baseline; justify-content: space-between; }
+  .sec-count { font-size: 12px; color: var(--label-3); padding: 0 14px 7px 0; font-variant-numeric: tabular-nums; }
 
   /* Action sheet, alert, menu, toast */
   .action-sheet { position: fixed; left: 50%; bottom: calc(8px + var(--safe-b)); transform: translate(-50%, 110%); width: min(400px, calc(100% - 16px)); z-index: 25; visibility: hidden; transition: transform var(--dur) var(--ease), visibility 0s linear var(--dur); }
@@ -825,9 +831,6 @@
   <div class="grabber"></div>
   <div class="sheet-head"><h2>Beat</h2><button class="nav-btn" data-close>Done</button></div>
   <div class="sheet-body">
-    <div class="inset" id="plBindBox" hidden>
-      <div class="row"><div><div class="lbl" id="plBindTitle">This lyric</div><div class="desc" id="plBindDesc">No beat attached</div></div><div class="ctl"><button class="small-btn" id="plAttach">Attach Current Beat</button></div></div>
-    </div>
     <div class="now"><div class="now-title" id="plTitle">Nothing loaded</div><div class="now-sub" id="plSub">Add audio files, or capture what’s playing on your computer.</div></div>
     <div class="yt-pane" id="ytPane" hidden>
       <div id="ytBox"></div>
@@ -845,21 +848,32 @@
       <button class="tr-btn big" id="plPlay" aria-label="Play or pause"><span id="plPlayIcon" data-icon="play"></span></button>
       <button class="tr-btn" id="plNext" aria-label="Next"><span data-icon="next"></span></button>
     </div>
-    <div class="inset">
-      <div class="row"><div><div class="lbl">Loop section</div><div class="desc" id="plLoopDesc">Set A, then B</div></div><div class="ctl"><button class="small-btn" id="plA">A</button><button class="small-btn" id="plB">B</button><button class="small-btn" id="plClear">Clear</button></div></div>
-      <div class="row"><div><div class="lbl">Loop</div><div class="desc" id="plLoopModeDesc"></div></div><div class="ctl"><div class="seg" id="plLoopMode"><button data-mode="off">Off</button><button data-mode="ab">A–B</button><button data-mode="track">Track</button><button data-mode="folder">Folder</button></div></div></div>
-      <div class="row"><div class="lbl">Volume</div><div class="ctl"><input type="range" min="0" max="100" value="100" id="plVol" aria-label="Volume"></div></div>
+    <div class="inset" id="plBindBox" hidden>
+      <div class="row"><div><div class="lbl" id="plBindTitle">This lyric</div><div class="desc" id="plBindDesc">No beat attached</div></div><div class="ctl"><button class="small-btn" id="plAttach">Attach Current Beat</button></div></div>
     </div>
-    <div class="sec-title" id="plListTitle">Playlist</div>
-    <ul class="inset" id="plList"></ul>
+
+    <div class="list-tools">
+      <div class="seg" id="plDirSeg" title="Which list to show"><button data-dir="beats">Beats</button><button data-dir="demos">Takes</button></div>
+      <div class="seg" data-setting="playlistSort" title="Order of the list"><button data-value="newest">Newest</button><button data-value="name">Name</button><button data-value="custom">Custom</button></div>
+    </div>
+    <label class="search compact"><span class="ico" data-icon="search"></span><input id="plSearch" type="search" placeholder="Filter this list" autocomplete="off" spellcheck="false" aria-label="Filter the list"></label>
+    <div class="sec-title-row"><div class="sec-title" id="plListTitle">Playlist</div><span class="sec-count" id="plCount"></span></div>
+    <ul class="inset scroll-list" id="plList"></ul>
     <p class="group-note" id="plEmpty">Drop audio files anywhere, or add them below.</p>
     <div class="btn-row">
       <button class="btn secondary" id="plReopenBeats" hidden>Reopen Music Folder</button>
       <button class="btn secondary" id="plAddFiles">Add Files…</button>
       <button class="btn secondary" id="plAddFolder">Music Folder…</button>
+      <button class="btn secondary" id="plAddLink">Add Link…</button>
       <button class="btn secondary" id="plCapture">Capture System Audio</button>
     </div>
     <p class="about" id="plFolderNote" hidden></p>
+
+    <div class="inset">
+      <div class="row"><div><div class="lbl">Loop section</div><div class="desc" id="plLoopDesc">Set A, then B</div></div><div class="ctl"><button class="small-btn" id="plA">A</button><button class="small-btn" id="plB">B</button><button class="small-btn" id="plClear">Clear</button></div></div>
+      <div class="row"><div><div class="lbl">Loop</div><div class="desc" id="plLoopModeDesc"></div></div><div class="ctl"><div class="seg" id="plLoopMode"><button data-mode="off">Off</button><button data-mode="ab">A–B</button><button data-mode="track">Track</button><button data-mode="folder">Folder</button></div></div></div>
+      <div class="row"><div class="lbl">Volume</div><div class="ctl"><input type="range" min="0" max="100" value="100" id="plVol" aria-label="Volume"></div></div>
+    </div>
     <form class="yt-form" id="ytForm"><input type="text" id="ytInput" placeholder="Paste a YouTube or SoundCloud link" autocomplete="off" spellcheck="false" aria-label="YouTube or SoundCloud link"><button class="small-btn" type="submit">Add</button></form>
     <p class="about">YouTube videos and SoundCloud tracks play in their own player above and join the playlist; rename a link from its … menu. The browser cannot analyze their sound, so for visuals and a live waveform turn on Capture System Audio while one plays.</p>
     <p class="about">System capture uses the browser’s share dialog: choose “Entire screen” and turn on “Share system audio”. The sound is analyzed for the visuals only, not played back.</p>
@@ -1044,7 +1058,7 @@ const DEFAULTS = {
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
   rhymeEquiv: [], rhymeGroups: [], rhymeIgnore: [],
   metroBpm: 90, metroSub: 1, metroAccent: true, metroVol: 60,
-  sort: 'modified', sidebar: true, beatsPerLine: 4, volume: 100, loopMode: 'folder', takeFormat: 'wav',
+  sort: 'modified', sidebar: true, beatsPerLine: 4, volume: 100, loopMode: 'folder', takeFormat: 'wav', playlistSort: 'newest',
   customTheme: null, lastPreset: 'system',
 };
 const LS = {
@@ -2024,12 +2038,19 @@ const Loops = {
 const Player = {
   items: [], idx: -1, url: null, loopA: null, loopB: null, loopTimer: null,
   // Which list Previous/Next (and the folder loop) walk through: the beats, or the open lyric's takes.
-  dirMode: 'beats',
+  dirMode: 'beats', filter: '',
+  // Order for any set of item indices: newest first (added or file date), by name, or the hand-dragged order.
+  sortIndices(idx) {
+    const s = settings.playlistSort || 'newest';
+    if (s === 'name') idx.sort((a, b) => collator.compare(this.items[a].name, this.items[b].name));
+    else if (s === 'newest') { const when = i => this.items[i].modified || this.items[i].added || 0; idx.sort((a, b) => when(b) - when(a)); }
+    return idx;
+  },
   pool() {
     const demos = this.dirMode === 'demos', rel = state.doc && state.doc.rel;
     const out = [];
     this.items.forEach((it, i) => { if (demos ? (it.kind === 'take' && (!rel || it.rel === rel)) : it.kind !== 'take') out.push(i); });
-    return out;
+    return this.sortIndices(out);
   },
   step(delta) {
     const pool = this.pool();
@@ -2067,7 +2088,7 @@ const Player = {
     this.render();
   },
   ensureTakes(list, rel) {
-    for (const x of list) if (!this.items.some(it => it.kind === 'take' && it.takeName === x.name)) this.items.push({ kind: 'take', name: x.name.replace(/\.[^.]+$/, ''), takeName: x.name, file: null, handle: x.handle, rel });
+    for (const x of list) if (!this.items.some(it => it.kind === 'take' && it.takeName === x.name)) this.items.push({ kind: 'take', name: x.name.replace(/\.[^.]+$/, ''), takeName: x.name, file: null, handle: x.handle, rel, modified: x.modified || 0 });
   },
   // Takes belong to one lyric: drop the previous lyric's takes from the list when another opens.
   pruneTakes(rel) {
@@ -2128,24 +2149,26 @@ const Player = {
     if (!id && !url) { toast('That does not look like a YouTube or SoundCloud link', 2600); return false; }
     let i = this.items.findIndex(x => id ? (x.kind === 'yt' && x.id === id) : (x.kind === 'sc' && x.url === url));
     if (i < 0) {
-      this.items.push(id ? { kind: 'yt', id, name: 'YouTube video', file: null, handle: null, custom: false } : { kind: 'sc', url, name: url.replace(/^https?:\/\/(?:[^/]+\/)/, '').replace(/[-_]+/g, ' '), file: null, handle: null, custom: false });
+      this.items.push(id ? { kind: 'yt', id, name: 'YouTube video', file: null, handle: null, custom: false, added: Date.now() } : { kind: 'sc', url, name: url.replace(/^https?:\/\/(?:[^/]+\/)/, '').replace(/[-_]+/g, ' '), file: null, handle: null, custom: false, added: Date.now() });
       i = this.items.length - 1; this.saveLinks();
     }
     this.play(i);
     return true;
   },
   saveLinks() {
-    LS.set('lyr:links', this.items.filter(x => x.kind === 'yt' || x.kind === 'sc').map(x => ({ kind: x.kind, id: x.id, url: x.url, name: x.name, custom: !!x.custom })));
+    LS.set('lyr:links', this.items.filter(x => x.kind === 'yt' || x.kind === 'sc').map(x => ({ kind: x.kind, id: x.id, url: x.url, name: x.name, custom: !!x.custom, added: x.added || 0 })));
     SettingsFile.schedule();
   },
   loadLinks() {
     let saved = LS.get('lyr:links', null);
     if (!Array.isArray(saved)) saved = (LS.get('lyr:yt', []) || []).map(s => Object.assign({ kind: 'yt' }, s));   // older builds kept YouTube links only
-    for (const s of saved) {
-      if (!s) continue;
-      if (s.kind === 'sc' && parseSoundCloud(s.url)) this.items.push({ kind: 'sc', url: parseSoundCloud(s.url), name: String(s.name || 'SoundCloud track'), file: null, handle: null, custom: !!s.custom });
-      else if (/^[A-Za-z0-9_-]{11}$/.test(s.id || '')) this.items.push({ kind: 'yt', id: s.id, name: String(s.name || 'YouTube video'), file: null, handle: null, custom: !!s.custom });
-    }
+    const base = Date.now() - saved.length * 1000;   // links saved without a date keep their saved order, oldest first
+    saved.forEach((s, k) => {
+      if (!s) return;
+      const added = s.added || base + k * 1000;
+      if (s.kind === 'sc' && parseSoundCloud(s.url)) this.items.push({ kind: 'sc', url: parseSoundCloud(s.url), name: String(s.name || 'SoundCloud track'), file: null, handle: null, custom: !!s.custom, added });
+      else if (/^[A-Za-z0-9_-]{11}$/.test(s.id || '')) this.items.push({ kind: 'yt', id: s.id, name: String(s.name || 'YouTube video'), file: null, handle: null, custom: !!s.custom, added });
+    });
   },
   async renameItem(i) {
     const it = this.items[i]; if (!it || !this.isWebItem(it)) return;
@@ -2170,7 +2193,7 @@ const Player = {
     const wasEmpty = this.items.length === 0;
     for (const f of files) {
       if (!(f.type && f.type.startsWith('audio/')) && !this.isAudioName(f.name)) continue;
-      this.items.push({ name: f.name.replace(/\.[^.]+$/, ''), file: f, handle: null });
+      this.items.push({ kind: 'file', name: f.name.replace(/\.[^.]+$/, ''), fileName: f.name, file: f, handle: null, added: Date.now() });
     }
     this.render();
     if (wasEmpty && this.items.length) this.play(0);
@@ -2182,8 +2205,8 @@ const Player = {
     const currentKey = current && current.fromFolder ? `${current.folderPath}/${current.fileName}` : null;
     let keepCurrent = !!(current && current.fromFolder);
     const folderItems = entries.map(e => {
-      if (currentKey === `${pathStr}/${e.name}`) { keepCurrent = false; return Object.assign({}, current, { handle: e.handle }); }   // keeps its decoded waveform
-      return { kind: 'file', name: e.name.replace(/\.[^.]+$/, ''), fileName: e.name, folderPath: pathStr, file: null, handle: e.handle, fromFolder: true };
+      if (currentKey === `${pathStr}/${e.name}`) { keepCurrent = false; return Object.assign({}, current, { handle: e.handle, modified: e.modified || current.modified || 0 }); }   // keeps its decoded waveform
+      return { kind: 'file', name: e.name.replace(/\.[^.]+$/, ''), fileName: e.name, folderPath: pathStr, file: null, handle: e.handle, fromFolder: true, modified: e.modified || 0 };
     });
     this.items = this.items.filter(x => !x.fromFolder).concat(keepCurrent ? [current] : [], folderItems);
     this.idx = current ? this.items.findIndex(it => it === current || (currentKey && it.fromFolder && `${it.folderPath}/${it.fileName}` === currentKey)) : -1;
@@ -2239,12 +2262,12 @@ const Player = {
     if (!beat) return -1;
     if (beat.kind === 'yt') {
       let i = this.items.findIndex(x => x.kind === 'yt' && x.id === beat.id);
-      if (i < 0) { this.items.push({ kind: 'yt', id: beat.id, name: beat.name || 'YouTube video', file: null, handle: null, custom: false }); i = this.items.length - 1; this.saveLinks(); }
+      if (i < 0) { this.items.push({ kind: 'yt', id: beat.id, name: beat.name || 'YouTube video', file: null, handle: null, custom: false, added: Date.now() }); i = this.items.length - 1; this.saveLinks(); }
       return i;
     }
     if (beat.kind === 'sc') {
       let i = this.items.findIndex(x => x.kind === 'sc' && x.url === beat.url);
-      if (i < 0) { this.items.push({ kind: 'sc', url: beat.url, name: beat.name || 'SoundCloud track', file: null, handle: null, custom: false }); i = this.items.length - 1; this.saveLinks(); }
+      if (i < 0) { this.items.push({ kind: 'sc', url: beat.url, name: beat.name || 'SoundCloud track', file: null, handle: null, custom: false, added: Date.now() }); i = this.items.length - 1; this.saveLinks(); }
       return i;
     }
     let i = this.items.findIndex(x => x.kind !== 'yt' && x.name === beat.name);
@@ -2335,7 +2358,8 @@ const Player = {
     el.plListTitle.textContent = this.dirMode === 'demos' ? `Takes · ${state.doc ? stem(state.doc.name) : 'this lyric'}` : 'Playlist';
     el.tbTrack.firstElementChild.textContent = label; el.tbTrack.title = label;
     el.plTitle.textContent = Sound.capturing ? 'System audio' : it ? it.name : 'Nothing loaded';
-    el.plSub.textContent = Sound.capturing ? 'Listening to what your computer plays' : it ? `${this.idx + 1} of ${this.items.length}` : Beats.needsReopen ? 'Your music folder is remembered. Reopen it to load the tracks.' : 'Add audio files, or capture what’s playing on your computer.';
+    const pool = this.pool();
+    el.plSub.textContent = Sound.capturing ? 'Listening to what your computer plays' : it ? `${Math.max(0, pool.indexOf(this.idx)) + 1} of ${pool.length || 1}` : Beats.needsReopen ? 'Your music folder is remembered. Reopen it to load the tracks.' : 'Add audio files, or capture what’s playing on your computer.';
     el.plReopenBeats.hidden = !Beats.needsReopen;
     el.plFolderNote.hidden = !Beats.handle;
     if (Beats.handle) el.plFolderNote.textContent = `Music folder: “${Beats.handle.name}”. Choose “Music Folder…” to pick a different one.`;
@@ -2354,8 +2378,11 @@ const Player = {
     el.tbABClear.hidden = this.loopA == null;
     if (Sheet.current === el.sheet_more) renderMore();
     el.plCapture.textContent = Sound.capturing ? 'Stop Capture' : 'Capture System Audio';
-    const pool = this.pool();
-    el.plList.innerHTML = pool.map(i => {
+    const q = this.filter.trim().toLowerCase();
+    const shown = q ? pool.filter(i => this.items[i].name.toLowerCase().includes(q)) : pool;
+    $$('button', el.plDirSeg).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.dir === this.dirMode)));
+    el.plCount.textContent = pool.length ? (q ? `${shown.length} of ${pool.length}` : plural(pool.length, this.dirMode === 'demos' ? 'take' : 'item')) : '';
+    el.plList.innerHTML = shown.map(i => {
       const x = this.items[i];
       const icon = x.kind === 'yt' ? ICONS.screen : x.kind === 'sc' ? ICONS.wave : x.kind === 'take' ? ICONS.mic : ICONS.music;
       const sub = x.kind === 'yt' ? '<div class="sub">YouTube</div>' : x.kind === 'sc' ? '<div class="sub">SoundCloud</div>' : x.kind === 'take' ? '<div class="sub">Take</div>' : '';
@@ -2363,8 +2390,8 @@ const Player = {
         : !x.fromFolder ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button>` : '';
       return `<li class="cell pl-cell${i === this.idx ? ' active' : ''}" data-i="${i}"><span class="ico">${icon}</span><div class="txt"><div class="ttl" title="${esc(x.name)}">${esc(x.name)}</div>${sub}</div>${rm}</li>`;
     }).join('');
-    el.plEmpty.hidden = pool.length > 0;
-    el.plEmpty.textContent = this.dirMode === 'demos' ? 'No takes for this lyric yet. Press the record button to make one.' : 'Drop audio files anywhere, or add them below.';
+    el.plEmpty.hidden = shown.length > 0;
+    el.plEmpty.textContent = q ? 'No matches' : this.dirMode === 'demos' ? 'No takes for this lyric yet. Press the record button to make one.' : 'Drop audio files anywhere, or add them below.';
     this.renderTime();
     const needTick = playing && mode === 'ab' && hasLoop;
     if (needTick && !this.loopTimer) this.loopTimer = setInterval(() => this.tick(), 40);
@@ -2375,7 +2402,7 @@ const Player = {
   // Play a recorded take through the main player, so the waveform, transport and volume all apply to it.
   playTake(x, rel) {
     let i = this.items.findIndex(it => it.kind === 'take' && it.takeName === x.name);
-    if (i < 0) { this.items.push({ kind: 'take', name: x.name.replace(/\.[^.]+$/, ''), takeName: x.name, file: null, handle: x.handle, rel }); i = this.items.length - 1; }
+    if (i < 0) { this.items.push({ kind: 'take', name: x.name.replace(/\.[^.]+$/, ''), takeName: x.name, file: null, handle: x.handle, rel, modified: x.modified || 0 }); i = this.items.length - 1; }
     if (i === this.idx) { this.toggle(); return; }
     this.play(i);
   },
@@ -2393,6 +2420,8 @@ const Player = {
     const rest = this.items.filter(it => !extras.includes(it));
     this.items = extras.concat(rest);
     this.idx = cur ? this.items.indexOf(cur) : -1;
+    // Dragging defines the order from now on, otherwise the next render would sort the change away.
+    if (settings.playlistSort !== 'custom') { settings.playlistSort = 'custom'; saveSettings(); syncSettingsUI(); toast('Playlist order: Custom', 1200); }
     this.saveLinks(); this.render();
   },
   renderTime() { Wave.draw(); },
@@ -2447,6 +2476,9 @@ el.plList.addEventListener('click', e => {
   if (rm) { e.stopPropagation(); Player.removeItem(+rm.dataset.remove); return; }
   const c = e.target.closest('.pl-cell'); if (c) Player.play(+c.dataset.i);
 });
+el.plSearch.addEventListener('input', () => { Player.filter = el.plSearch.value; Player.render(); });
+el.plDirSeg.addEventListener('click', e => { const b = e.target.closest('button[data-dir]'); if (b) Player.setDir(b.dataset.dir); });
+el.plAddLink.addEventListener('click', () => promptLink());
 el.plAddFiles.addEventListener('click', () => el.fileAudio.click());
 el.fileAudio.addEventListener('change', () => { Player.add(Array.from(el.fileAudio.files || [])); el.fileAudio.value = ''; });
 el.plAddFolder.addEventListener('click', () => Beats.pick());
@@ -3748,14 +3780,26 @@ const Music = {
       this.render(); return;
     }
     if (seq !== this.seq) return;
-    folders.sort((a, b) => collator.compare(a.name, b.name)); tracks.sort((a, b) => collator.compare(a.name, b.name));
-    this.folders = folders; this.tracks = tracks;
-    // The browsed folder becomes the beats list, unless a track from another folder is playing right now.
-    const cur = Player.current();
-    if (!(cur && cur.fromFolder && !Player.paused() && cur.folderPath !== this.pathStr())) Player.setFolderItems(tracks, this.pathStr());
+    // File dates, so "Newest" can put the latest beats first (metadata only, read in parallel).
+    await Promise.all(tracks.map(async t => { try { const f = await t.handle.getFile(); t.modified = f.lastModified; t.size = f.size; } catch { t.modified = 0; } }));
+    if (seq !== this.seq) return;
+    folders.sort((a, b) => collator.compare(a.name, b.name));
+    this.folders = folders; this.tracks = tracks; this.sortTracks();
+    this.syncPlayer();
     this.render();
     for (const f of folders) { f.count = await Beats.countAudio(f.handle); if (seq !== this.seq) return; }
     this.render();
+  },
+  // Folder tracks follow the list order setting: newest first (file date), or by name. Custom (drag) order applies to the playlist only.
+  sortTracks() {
+    const s = settings.playlistSort || 'newest';
+    if (s === 'newest') this.tracks.sort((a, b) => ((b.modified || 0) - (a.modified || 0)) || collator.compare(a.name, b.name));
+    else this.tracks.sort((a, b) => collator.compare(a.name, b.name));
+  },
+  // The browsed folder becomes the beats list, unless a track from another folder is playing right now.
+  syncPlayer() {
+    const cur = Player.current();
+    if (!(cur && cur.fromFolder && !Player.paused() && cur.folderPath !== this.pathStr())) Player.setFolderItems(this.tracks, this.pathStr());
   },
   up() { this.navigate(this.path.slice(0, -1)); },
   playTrack(name) {
@@ -3792,8 +3836,9 @@ const Music = {
     el.musicFolderName.textContent = Beats.handle ? Beats.handle.name : Beats.needsReopen ? 'Reopen music folder' : 'Choose Music Folder…';
     const cur = Player.current(), playing = !Player.paused();
     const stateIcon = fallback => (playing ? ICONS.pause : ICONS.play) || fallback;
-    // Playlist: added files and links, not the browsed folder and not takes
-    const extra = []; Player.items.forEach((it, i) => { if (!it.fromFolder && it.kind !== 'take' && hit(it.name)) extra.push({ it, i }); });
+    // Playlist: added files and links, not the browsed folder and not takes; same order as the Beat sheet
+    const extraIdx = []; Player.items.forEach((it, i) => { if (!it.fromFolder && it.kind !== 'take' && hit(it.name)) extraIdx.push(i); });
+    const extra = Player.sortIndices(extraIdx).map(i => ({ it: Player.items[i], i }));
     el.musicPlaylist.innerHTML = extra.map(({ it, i }) => {
       const active = it === cur, sub = it.kind === 'yt' ? 'YouTube' : it.kind === 'sc' ? 'SoundCloud' : it.folderPath != null ? (it.folderPath || (Beats.handle ? Beats.handle.name : 'Music folder')) : 'File';
       const icon = active ? stateIcon() : it.kind === 'yt' ? ICONS.screen : it.kind === 'sc' ? ICONS.wave : ICONS.music;
@@ -4244,6 +4289,7 @@ function onSettingChange(key) {
     case 'uiStyle': applyStyle(); Wave.updateColors(); Wave.draw(true); Fonts.apply(true); break;
     case 'lyricFont': Fonts.apply(false); break;
     case 'sort': sortFiles(); renderList(); break;
+    case 'playlistSort': Music.sortTracks(); Music.syncPlayer(); Player.render(); break;
     default: break;
   }
   syncSettingsUI();
@@ -4272,6 +4318,7 @@ function bindSettingControls(root) {
 }
 bindSettingControls(el.sheet_settings);
 bindSettingControls(el.sheet_more);
+bindSettingControls(el.sheet_player);
 
 /* Phone-only Controls sheet (the arrow in the toolbar): the controls that do not fit a narrow toolbar. */
 function renderMore() {
@@ -4726,7 +4773,7 @@ const Library = {
       let added = false;
       for (const [id, name] of Object.entries(Y)) {
         if (!/^[A-Za-z0-9_-]{11}$/.test(id) || Player.items.some(x => x.kind === 'yt' && x.id === id)) continue;
-        Player.items.push({ kind: 'yt', id, name: String(name || 'YouTube video'), file: null, handle: null, custom: !!name }); added = true;
+        Player.items.push({ kind: 'yt', id, name: String(name || 'YouTube video'), file: null, handle: null, custom: !!name, added: Date.now() }); added = true;
       }
       if (added) { Player.saveLinks(); Player.render(); }
     }
@@ -4736,7 +4783,7 @@ const Library = {
       for (const [raw, name] of Object.entries(C)) {
         const url = parseSoundCloud(raw);
         if (!url || Player.items.some(x => x.kind === 'sc' && x.url === url)) continue;
-        Player.items.push({ kind: 'sc', url, name: String(name || 'SoundCloud track'), file: null, handle: null, custom: !!name }); added = true;
+        Player.items.push({ kind: 'sc', url, name: String(name || 'SoundCloud track'), file: null, handle: null, custom: !!name, added: Date.now() }); added = true;
       }
       if (added) { Player.saveLinks(); Player.render(); }
     }
