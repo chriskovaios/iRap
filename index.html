@@ -2238,7 +2238,7 @@ const Player = {
       const icon = x.kind === 'yt' ? ICONS.screen : x.kind === 'take' ? ICONS.mic : ICONS.music;
       const sub = x.kind === 'yt' ? '<div class="sub">YouTube</div>' : x.kind === 'take' ? '<div class="sub">Take</div>' : '';
       const rm = !x.fromFolder ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button>` : '';
-      return `<li class="cell pl-cell${i === this.idx ? ' active' : ''}" data-i="${i}"><span class="ico">${icon}</span><div class="txt"><div class="ttl">${esc(x.name)}</div>${sub}</div>${rm}</li>`;
+      return `<li class="cell pl-cell${i === this.idx ? ' active' : ''}" data-i="${i}"><span class="ico">${icon}</span><div class="txt"><div class="ttl" title="${esc(x.name)}">${esc(x.name)}</div>${sub}</div>${rm}</li>`;
     }).join('');
     el.plEmpty.hidden = pool.length > 0;
     el.plEmpty.textContent = this.dirMode === 'demos' ? 'No takes for this lyric yet. Press the record button to make one.' : 'Drop audio files anywhere, or add them below.';
@@ -3032,7 +3032,7 @@ function renderList() {
   const q = state.filter.trim().toLowerCase();
   if (state.sideMode !== 'music') renderCrumbs('lyrics');
   const snip = rel => (state.snippets.get(rel) || {}).text || '';
-  const fileCell = (f, sub) => `<li class="cell${state.doc && state.doc.rel === f.rel ? ' active' : ''}" data-rel="${esc(f.rel)}" role="button" tabindex="0"><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>${esc(sub)}</div></div></li>`;
+  const fileCell = (f, sub) => `<li class="cell${state.doc && state.doc.rel === f.rel ? ' active' : ''}" data-rel="${esc(f.rel)}" role="button" tabindex="0"><div class="txt"><div class="ttl" title="${esc(stem(f.name))}">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>${esc(sub)}</div></div></li>`;
   if (q) {
     const hits = (state.tree || []).filter(f => stem(f.name).toLowerCase().includes(q) || snip(f.rel).toLowerCase().includes(q));
     el.fileList.innerHTML = hits.map(f => fileCell(f, pathLabel(f.path))).join('');
@@ -3041,7 +3041,7 @@ function renderList() {
     el.trashGroup.hidden = true;
     return;
   }
-  const folders = state.folders.map(d => `<li class="cell folder" data-dir="${esc(d.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl">${esc(d.name)}</div><div class="sub">${plural(d.count, 'lyric')}</div></div><button class="icon-btn cell-more" data-more="${esc(d.name)}" aria-label="Folder options" title="Folder options">${ICONS.more}</button></li>`).join('');
+  const folders = state.folders.map(d => `<li class="cell folder" data-dir="${esc(d.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl" title="${esc(d.name)}">${esc(d.name)}</div><div class="sub">${plural(d.count, 'lyric')}</div></div><button class="icon-btn cell-more" data-more="${esc(d.name)}" aria-label="Folder options" title="Folder options">${ICONS.more}</button></li>`).join('');
   const files = state.files.map(f => fileCell(f, snip(f.rel) || 'No additional text')).join('');
   el.fileList.innerHTML = folders + files;
   el.listEmpty.hidden = !!(folders || files);
@@ -3050,7 +3050,7 @@ function renderList() {
   el.trashCount.textContent = state.trash.length ? `(${state.trash.length})` : '';
   el.trashList.hidden = !state.trashOpen; el.btnEmptyTrash.hidden = !state.trashOpen;
   el.trashToggle.setAttribute('aria-expanded', String(state.trashOpen));
-  el.trashList.innerHTML = state.trash.map(f => `<li class="cell" data-trash="${esc(f.name)}" role="button" tabindex="0"><span class="ico">${ICONS.trash}</span><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>Tap to restore or delete forever</div></div></li>`).join('');
+  el.trashList.innerHTML = state.trash.map(f => `<li class="cell" data-trash="${esc(f.name)}" role="button" tabindex="0"><span class="ico">${ICONS.trash}</span><div class="txt"><div class="ttl" title="${esc(stem(f.name))}">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>Tap to restore or delete forever</div></div></li>`).join('');
 }
 function closeDoc() {
   state.doc = null; cancelSave(); AutoScroll.stop();
@@ -3090,6 +3090,7 @@ async function openFile(entry, opts = {}) {
   state.doc.rhymes = meta.groups; state.doc.rhymesOff = meta.off;
   el.ta.value = text;
   el.docInner.hidden = false; el.emptyDoc.hidden = true; el.docTitle.textContent = stem(entry.name);
+  el.docTitle.title = `${stem(entry.name)} · click to rename`;
   renderMirror(); renderReader(); setEditing(state.editing, true);
   Picker.render();
   if (state.sideMode === 'music') Demos.refresh().catch(e => console.warn(e));
@@ -3260,7 +3261,7 @@ async function renameCurrent() {
     await rekey(d.rel, newRel, d.dirty ? d.text : null);
     d.name = name; d.rel = newRel; d.handle = h; d.modified = (await h.getFile()).lastModified;
     LS.set(lastKey(), newRel);
-    el.docTitle.textContent = stem(name);
+    el.docTitle.textContent = stem(name); el.docTitle.title = `${stem(name)} · click to rename`;
     await refreshList(); broadcast({ type: 'list' });
   } catch (e) { handleFsError(e); }
 }
@@ -3374,7 +3375,7 @@ const MoveUI = {
     folders.sort((a, b) => collator.compare(a.name, b.name));
     el.mvPath.textContent = pathLabel(this.path);
     const up = this.path.length ? `<li class="cell" data-mv-up="1" role="button" tabindex="0"><span class="ico">${ICONS.back}</span><div class="txt"><div class="ttl">${esc(this.path.length > 1 ? this.path[this.path.length - 2] : 'Lyrics')}</div></div></li>` : '';
-    el.mvList.innerHTML = up + folders.map(d => `<li class="cell folder" data-mv-dir="${esc(d.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl">${esc(d.name)}</div></div><span class="ico chev">${ICONS.chev}</span></li>`).join('');
+    el.mvList.innerHTML = up + folders.map(d => `<li class="cell folder" data-mv-dir="${esc(d.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl" title="${esc(d.name)}">${esc(d.name)}</div></div><span class="ico chev">${ICONS.chev}</span></li>`).join('');
     el.mvEmpty.hidden = !!(up || folders.length);
     const here = samePath(this.path, relDir(this.rel));
     el.mvHere.disabled = here;
@@ -3669,7 +3670,7 @@ const Music = {
     const extra = []; Player.items.forEach((it, i) => { if (!it.fromFolder && it.kind !== 'take' && hit(it.name)) extra.push({ it, i }); });
     el.musicPlaylist.innerHTML = extra.map(({ it, i }) => {
       const active = it === cur, sub = it.kind === 'yt' ? 'YouTube' : it.folderPath != null ? (it.folderPath || (Beats.handle ? Beats.handle.name : 'Music folder')) : 'File';
-      return `<li class="cell${active ? ' active' : ''}" data-mitem="${i}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : it.kind === 'yt' ? ICONS.screen : ICONS.music}</span><div class="txt"><div class="ttl">${esc(it.name)}</div><div class="sub">${esc(sub)}</div></div><button class="icon-btn cell-more" data-mremove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button></li>`;
+      return `<li class="cell${active ? ' active' : ''}" data-mitem="${i}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : it.kind === 'yt' ? ICONS.screen : ICONS.music}</span><div class="txt"><div class="ttl" title="${esc(it.name)}">${esc(it.name)}</div><div class="sub">${esc(sub)}</div></div><button class="icon-btn cell-more" data-mremove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button></li>`;
     }).join('');
     el.musicPlaylistGroup.hidden = !extra.length;
     // Folder browser
@@ -3681,10 +3682,10 @@ const Music = {
       el.musicChoose.textContent = Beats.needsReopen ? 'Reopen Music Folder' : 'Choose Music Folder…';
     } else {
       const ps = this.pathStr();
-      const folders = this.folders.filter(f => hit(f.name)).map(f => `<li class="cell folder" data-mdir="${esc(f.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl">${esc(f.name)}</div><div class="sub">${f.count == null ? 'Folder' : plural(f.count, 'track')}</div></div><span class="ico chev">${ICONS.chev}</span></li>`);
+      const folders = this.folders.filter(f => hit(f.name)).map(f => `<li class="cell folder" data-mdir="${esc(f.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl" title="${esc(f.name)}">${esc(f.name)}</div><div class="sub">${f.count == null ? 'Folder' : plural(f.count, 'track')}</div></div><span class="ico chev">${ICONS.chev}</span></li>`);
       const tracks = this.tracks.filter(t => hit(t.name)).map(t => {
         const active = !!cur && cur.fromFolder && cur.folderPath === ps && cur.fileName === t.name;
-        return `<li class="cell track${active ? ' active' : ''}" data-mtrack="${esc(t.name)}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : ICONS.music}</span><div class="txt"><div class="ttl">${esc(t.name.replace(/\.[^.]+$/, ''))}</div><div class="sub">${esc(t.name.split('.').pop().toUpperCase())}</div></div><button class="icon-btn cell-more" data-mmore="${esc(t.name)}" aria-label="Track options" title="Track options">${ICONS.more}</button></li>`;
+        return `<li class="cell track${active ? ' active' : ''}" data-mtrack="${esc(t.name)}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : ICONS.music}</span><div class="txt"><div class="ttl" title="${esc(t.name)}">${esc(t.name.replace(/\.[^.]+$/, ''))}</div><div class="sub">${esc(t.name.split('.').pop().toUpperCase())}</div></div><button class="icon-btn cell-more" data-mmore="${esc(t.name)}" aria-label="Track options" title="Track options">${ICONS.more}</button></li>`;
       });
       el.musicList.innerHTML = folders.join('') + tracks.join('');
       el.musicEmpty.hidden = !!(folders.length || tracks.length);
@@ -3697,7 +3698,7 @@ const Music = {
     el.musicTakesTitle.textContent = state.doc ? `Takes · ${stem(state.doc.name)}` : 'Takes';
     el.musicTakes.innerHTML = takes.map((x, i) => {
       const active = !!cur && cur.kind === 'take' && cur.takeName === x.name;
-      return `<li class="cell${active ? ' active' : ''}" data-mtake="${i}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : ICONS.mic}</span><div class="txt"><div class="ttl">${esc(x.name.slice(Demos.prefix(state.doc).length).replace(/\.[^.]+$/, ''))}</div><div class="sub"><b>${esc(fmtDate(x.modified))}</b>${esc(fmtSize(x.size))}</div></div></li>`;
+      return `<li class="cell${active ? ' active' : ''}" data-mtake="${i}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : ICONS.mic}</span><div class="txt"><div class="ttl" title="${esc(x.name)}">${esc(x.name.slice(Demos.prefix(state.doc).length).replace(/\.[^.]+$/, ''))}</div><div class="sub"><b>${esc(fmtDate(x.modified))}</b>${esc(fmtSize(x.size))}</div></div></li>`;
     }).join('');
   },
 };
@@ -3794,7 +3795,7 @@ const Fonts = {
   },
   async renderSheet() {
     const cur = settings.lyricFont || 'default';
-    const row = (id, label, stack, sub) => `<li class="cell font-cell${id === cur ? ' active' : ''}" data-font="${esc(id)}" role="button" tabindex="0"><div class="txt"><div class="ttl" style="font-family:${esc(stack)}">${esc(label)}</div><div class="sub" style="font-family:${esc(stack)}">${esc(sub || FONT_SAMPLE)}</div></div>${id === cur ? `<span class="ico">${ICONS.check}</span>` : ''}</li>`;
+    const row = (id, label, stack, sub) => `<li class="cell font-cell${id === cur ? ' active' : ''}" data-font="${esc(id)}" role="button" tabindex="0"><div class="txt"><div class="ttl" title="${esc(label)}" style="font-family:${esc(stack)}">${esc(label)}</div><div class="sub" style="font-family:${esc(stack)}">${esc(sub || FONT_SAMPLE)}</div></div>${id === cur ? `<span class="ico">${ICONS.check}</span>` : ''}</li>`;
     const styleDefault = settings.uiStyle === 'ios' ? FONT_STACKS.plain : FONT_STACKS.marker;
     el.fontList.innerHTML = [row('default', 'Style default', styleDefault, settings.uiStyle === 'ios' ? 'The system font of the iPhone style' : 'The marker hand of the graffiti style')]
       .concat(Object.keys(FONT_STACKS).map(id => row(id, FONT_LABELS[id], FONT_STACKS[id]))).join('');
@@ -4209,6 +4210,7 @@ function renderCrumbs(mode) {
   const rootName = music ? (Beats.handle ? Beats.handle.name : 'Music') : (FS.handle ? (FS.isVirtual ? 'On this device' : FS.handle.name) : 'Lyrics');
   const canParent = FS.supported && (music ? !!Beats.handle : (!!FS.handle && !FS.isVirtual));
   el.sideTitle.textContent = path.length ? path[path.length - 1] : (music ? 'Music' : 'Lyrics');
+  el.sideTitle.title = path.length ? [rootName].concat(path).join(' › ') : rootName;
   el.btnUp.hidden = false;
   el.btnUp.disabled = !path.length && !canParent;
   el.btnUp.lastElementChild.textContent = path.length ? (path.length > 1 ? path[path.length - 2] : rootName) : (canParent ? 'Parent folder…' : (music ? 'Music' : 'Lyrics'));
@@ -4756,7 +4758,7 @@ const Demos = {
       const label = x.name.slice(p.length).replace(/\.[^.]+$/, '');
       const cur = Player.current();
       const playingThis = !!cur && cur.kind === 'take' && cur.takeName === x.name && !Player.paused();
-      return `<li class="cell demo-cell" data-i="${i}"><button class="icon-btn" data-play="${i}" aria-label="${playingThis ? 'Pause' : 'Play'}">${playingThis ? ICONS.pause : ICONS.play}</button><div class="txt"><div class="ttl">${esc(label)}</div><div class="sub"><b>${esc(fmtDate(x.modified))}</b>${esc(fmtSize(x.size))} · ${esc(x.name.split('.').pop().toUpperCase())}</div></div><button class="icon-btn cell-more" data-demo-more="${i}" aria-label="Take options">${ICONS.more}</button></li>`;
+      return `<li class="cell demo-cell" data-i="${i}"><button class="icon-btn" data-play="${i}" aria-label="${playingThis ? 'Pause' : 'Play'}">${playingThis ? ICONS.pause : ICONS.play}</button><div class="txt"><div class="ttl" title="${esc(x.name)}">${esc(label)}</div><div class="sub"><b>${esc(fmtDate(x.modified))}</b>${esc(fmtSize(x.size))} · ${esc(x.name.split('.').pop().toUpperCase())}</div></div><button class="icon-btn cell-more" data-demo-more="${i}" aria-label="Take options">${ICONS.more}</button></li>`;
     }).join('');
     el.demoEmpty.hidden = this.list.length > 0 || !d;
     const t = this.pickType();
@@ -5135,7 +5137,7 @@ const Picker = {
 };
 function renderManualGroups() {
   const groups = (state.doc && state.doc.rhymes) || [];
-  el.manualList.innerHTML = groups.map((g, i) => `<li class="cell"><span class="dot" style="--tint:${solidTint(TINTS[g.color % 8])}"></span><div class="txt"><div class="ttl">${esc(g.words.join(', '))}</div><div class="sub">Group ${g.color + 1}</div></div><button class="icon-btn cell-more" data-manual-rm="${i}" aria-label="Remove group">${ICONS.xmark}</button></li>`).join('');
+  el.manualList.innerHTML = groups.map((g, i) => `<li class="cell"><span class="dot" style="--tint:${solidTint(TINTS[g.color % 8])}"></span><div class="txt"><div class="ttl" title="${esc(g.words.join(', '))}">${esc(g.words.join(', '))}</div><div class="sub">Group ${g.color + 1}</div></div><button class="icon-btn cell-more" data-manual-rm="${i}" aria-label="Remove group">${ICONS.xmark}</button></li>`).join('');
   el.manualEmpty.hidden = groups.length > 0;
   el.manualAuto.setAttribute('aria-checked', String(!!state.doc && !state.doc.rhymesOff));
   el.manualAuto.disabled = !state.doc;
