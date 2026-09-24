@@ -436,6 +436,18 @@
     --ink: var(--label);
     --sticker: 3px 3px 0 var(--ink);
   }
+  /* No Apple faces anywhere in this style: UI text in a condensed stencil-like sans, lyrics in the marker hand. */
+  html[data-style="graffiti"] {
+    --font: "Bahnschrift", "Bahnschrift SemiCondensed", "AvenirNextCondensed-Medium", "Avenir Next Condensed", "Franklin Gothic Medium", "Trebuchet MS", "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
+    --font-lyric: var(--font-tag);
+  }
+  html[data-style="graffiti"][data-lyric-font="stencil"] { --font-lyric: var(--font); }
+  html[data-style="graffiti"][data-lyric-font="plain"] { --font-lyric: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  html[data-style="graffiti"] body { font-family: var(--font); }
+  html[data-style="graffiti"] .mirror, html[data-style="graffiti"] .ta, html[data-style="graffiti"] .reader { font-family: var(--font-lyric); }
+  html[data-style="graffiti"] .ta::placeholder { font-family: var(--font-lyric); }
+  html[data-style="graffiti"] .about, html[data-style="graffiti"] .group-note, html[data-style="graffiti"] .rules, html[data-style="graffiti"] .search input, html[data-style="graffiti"] .yt-form input, html[data-style="graffiti"] .alert input, html[data-style="graffiti"] .menu button, html[data-style="graffiti"] .title, html[data-style="graffiti"] .pick-words { font-family: var(--font); }
+  html[data-style="ios"] #lyricFontRow { display: none; }
   /* Ink is the text color pulled a step toward the background: paper-white, never blinding. */
   @supports (color: color-mix(in srgb, red, blue)) {
     html[data-style="graffiti"] { --ink: color-mix(in srgb, var(--label) 91%, var(--bg)); }
@@ -713,6 +725,7 @@
     <div class="sec-title">Theme</div>
     <div class="inset">
       <div class="row"><div><div class="lbl">Style</div><div class="desc">Graffiti stickers and block letters, or the plain iPhone look</div></div><div class="ctl"><div class="seg" data-setting="uiStyle"><button data-value="graffiti">Graffiti</button><button data-value="ios">iPhone</button></div></div></div>
+      <div class="row" id="lyricFontRow"><div><div class="lbl">Lyric font</div><div class="desc">How the lyric text itself is drawn in the graffiti style</div></div><div class="ctl"><div class="seg" data-setting="lyricFont"><button data-value="marker">Marker</button><button data-value="stencil">Stencil</button><button data-value="plain">Plain</button></div></div></div>
       <div class="swatches" id="swatches"></div>
       <div id="customTheme" hidden>
         <div class="row"><div class="lbl">Background</div><div class="ctl"><input type="color" data-color="bg" aria-label="Background color"></div></div>
@@ -973,7 +986,7 @@ $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
    Settings
    ============================================================ */
 const DEFAULTS = {
-  theme: 'graffiti', uiStyle: 'graffiti', grain: false, fontSize: 18,
+  theme: 'graffiti', uiStyle: 'graffiti', lyricFont: 'marker', grain: false, fontSize: 18,
   visuals: true, intensity: 60,
   syllables: true, synizesis: true, linesPerBar: 1,
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
@@ -3921,7 +3934,7 @@ function onSettingChange(key) {
     case 'metroBpm': case 'metroSub': case 'metroAccent': case 'metroVol': Metro.render(); break;
     case 'beatsPerLine': AutoScroll.render(); break;
     case 'takeFormat': Demos.render(); break;
-    case 'uiStyle': applyStyle(); Wave.draw(true); break;
+    case 'uiStyle': case 'lyricFont': applyStyle(); Wave.updateColors(); Wave.draw(true); queueRender(); if (state.doc && !state.editing) renderReader(); break;
     case 'sort': sortFiles(); renderList(); break;
     default: break;
   }
@@ -5009,7 +5022,10 @@ function applyEditorSize() {
   root.setProperty('--editor-size', `${size}px`);
   root.setProperty('--editor-line', `${Math.round(size * 1.55)}px`);
 }
-function applyStyle() { document.documentElement.dataset.style = settings.uiStyle === 'ios' ? 'ios' : 'graffiti'; }
+function applyStyle() {
+  document.documentElement.dataset.style = settings.uiStyle === 'ios' ? 'ios' : 'graffiti';
+  document.documentElement.dataset.lyricFont = ['marker', 'stencil', 'plain'].includes(settings.lyricFont) ? settings.lyricFont : 'marker';
+}
 function applyInitialSettings() {
   const root = document.documentElement.style;
   applyStyle();
