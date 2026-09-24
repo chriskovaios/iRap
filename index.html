@@ -208,6 +208,7 @@
   .pick-swatch:hover { transform: scale(1.15); }
   .pick-swatch:disabled { opacity: .3; cursor: default; transform: none; }
   .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--tint); flex: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+  .dot.off { background: transparent; box-shadow: none; border: 1.5px dashed var(--label-3); }
   /* “ - ” reads as a short pause; “~” pulls two words together */
   .reader .pause { display: inline-block; width: .9em; height: .14em; background: var(--label-3); border-radius: 1px; vertical-align: middle; margin: 0 .38em; }
   .reader .tie { display: inline-block; width: .55em; height: .32em; border: 1.5px solid var(--accent); border-top: 0; border-radius: 0 0 .6em .6em; vertical-align: -.38em; margin: 0 .03em; opacity: .85; }
@@ -694,7 +695,8 @@
       <span class="pick-words" id="pickWords"></span>
       <span class="pick-colors" id="pickColors"></span>
       <button class="small-btn" id="pickUngroup" title="Remove the picked words from their groups">Ungroup</button>
-      <button class="small-btn" id="pickClear" title="Clear picks, connected groups and automatic tints in this lyric">Clear</button>
+      <button class="small-btn" id="pickClear" title="Remove the highlight from the picked words in this lyric, connected or automatic">Clear</button>
+      <button class="small-btn" id="pickClearAll" title="Blank slate for this lyric: picks, connected groups, cleared words and automatic tints">Clear All</button>
       <button class="small-btn" id="pickMode" aria-pressed="false" title="Pick words by tapping, without Ctrl">Pick mode</button>
     </div>
     <div class="wavebar" id="wavebar">
@@ -896,7 +898,7 @@
     <div class="sec-title">This lyric</div>
     <div class="inset"><div class="row"><div><div class="lbl">Automatic rhymes here</div><div class="desc">Built-in matching, for this lyric only</div></div><div class="ctl"><button class="switch" role="switch" id="manualAuto" aria-checked="true" aria-label="Automatic rhymes in this lyric"></button></div></div></div>
     <ul class="inset" id="manualList"></ul>
-    <p class="group-note" id="manualEmpty">No connected groups yet. Ctrl+click words in the lyric, or use Pick mode, then choose a color.</p>
+    <p class="group-note" id="manualEmpty">No connected groups yet. Ctrl+click words in the lyric, or use Pick mode, then choose a color. Clear in that bar hides the picked words' highlights here; they are listed above with a restore button.</p>
     <div class="btn-row"><button class="btn secondary" id="manualPickMode">Pick Words…</button></div>
     <div class="sec-title">Endings that rhyme</div>
     <div class="inset rules-box"><textarea class="rules" id="rulesEquiv" rows="4" spellcheck="false" placeholder="an = am = ang&#10;ος = ους" aria-label="Endings that rhyme"></textarea></div>
@@ -2822,10 +2824,11 @@ function analyze(lines) {
       }
     }
   }
-  // Hand-picked groups for this lyric (from the picker) and pending picks. Marks carry [start, end, color, kind].
+  // Hand-picked groups for this lyric (from the picker), words cleared by hand, and pending picks. Marks carry [start, end, color, kind].
   const manual = (state.doc && Array.isArray(state.doc.rhymes)) ? state.doc.rhymes : [];
+  const hidden = (state.doc && Array.isArray(state.doc.rhymesHide)) ? state.doc.rhymesHide : [];
   const picks = state.picks || [];
-  if (manual.length || picks.length) {
+  if (manual.length || picks.length || hidden.length) {
     const cw = words.map(ws => ws.map(m => cleanWord(m[0])));
     const phraseToks = p => String(p).split(/\s+/).map(cleanWord).filter(Boolean);
     const eachOccurrence = (toks, fn) => {
@@ -2839,12 +2842,15 @@ function analyze(lines) {
         }
       }
     };
-    const manualMarks = lines.map(() => []), pickMarks = lines.map(() => []);
+    const manualMarks = lines.map(() => []), pickMarks = lines.map(() => []), hideMarks = lines.map(() => []);
     manual.forEach((g, gi) => { const col = Number.isInteger(g.color) ? g.color : gi; for (const p of g.words || []) eachOccurrence(phraseToks(p), (i, s, e) => manualMarks[i].push([s, e, col, 'm'])); });
+    for (const p of hidden) eachOccurrence(phraseToks(p), (i, s, e) => hideMarks[i].push([s, e]));
     for (const p of picks) eachOccurrence(phraseToks(p), (i, s, e) => pickMarks[i].push([s, e, -1, 'pk']));
+    const overlaps = (a, list) => list.some(m => a[0] < m[1] && m[0] < a[1]);
     for (let i = 0; i < n; i++) {
-      if (!manualMarks[i].length && !pickMarks[i].length) continue;
-      let list = (marks[i] || []).filter(a => !manualMarks[i].some(m => a[0] < m[1] && m[0] < a[1])).concat(manualMarks[i]);
+      if (!manualMarks[i].length && !pickMarks[i].length && !hideMarks[i].length) continue;
+      // Cleared words lose their automatic tint; connected groups replace automatic marks where they overlap.
+      let list = (marks[i] || []).filter(a => !overlaps(a, hideMarks[i]) && !overlaps(a, manualMarks[i])).concat(manualMarks[i]);
       for (const pk of pickMarks[i]) {
         const hit = list.find(a => a[0] <= pk[0] && a[1] >= pk[1]);
         if (hit) hit[3] = `${hit[3] || 'a'} pk`; else list.push(pk);
@@ -3244,7 +3250,7 @@ async function openFile(entry, opts = {}) {
   state.picks = [];
   const meta = await Manual.load(entry.rel);
   if (state.doc.rel !== entry.rel) return;   // another lyric was opened meanwhile
-  state.doc.rhymes = meta.groups; state.doc.rhymesOff = meta.off;
+  state.doc.rhymes = meta.groups; state.doc.rhymesOff = meta.off; state.doc.rhymesHide = meta.hide;
   el.ta.value = text;
   el.docInner.hidden = false; el.emptyDoc.hidden = true; el.docTitle.textContent = stem(entry.name);
   el.docTitle.title = `${stem(entry.name)} · click to rename`;
@@ -3669,7 +3675,7 @@ const Bindings = {
   async remove(name) { const k = this.key(name); this.cache.set(k, null); await safe(() => DB.delBinding(k)); SettingsFile.schedule(); },
   // Store the record if anything meaningful is left in it, otherwise drop it.
   async putOrRemove(name, rec) {
-    const keep = !!(rec.beat || (Array.isArray(rec.rhymes) && rec.rhymes.length) || rec.rhymesOff || (Array.isArray(rec.demos) && rec.demos.length));
+    const keep = !!(rec.beat || (Array.isArray(rec.rhymes) && rec.rhymes.length) || rec.rhymesOff || (Array.isArray(rec.rhymesHide) && rec.rhymesHide.length) || (Array.isArray(rec.demos) && rec.demos.length));
     if (keep) await this.put(name, rec); else await this.remove(name);
   },
   async rename(oldName, newName) {
@@ -4700,6 +4706,7 @@ const Library = {
           for (const g of r.rhymes) { const k = `g${((g.color | 0) % 8) + 1}`; o.rhymes[k] = (o.rhymes[k] || []).concat(g.words || []); }
         }
         if (r.rhymesOff) o.rhymesOff = true;
+        if (Array.isArray(r.rhymesHide) && r.rhymesHide.length) o.hidden = r.rhymesHide.slice();
         if (Array.isArray(r.demos) && r.demos.length) o.demos = r.demos.slice();
         if (!Object.keys(o).length) continue;
         o.updated = new Date(r.updated || Date.now()).toISOString();
@@ -4750,6 +4757,7 @@ const Library = {
           if (!rec.rhymes.length) delete rec.rhymes;
         }
         if (o.rhymesOff === true) rec.rhymesOff = true;
+        if (Array.isArray(o.hidden) && o.hidden.length) { rec.rhymesHide = o.hidden.map(String).map(s => s.trim()).filter(Boolean); if (!rec.rhymesHide.length) delete rec.rhymesHide; }
         if (Array.isArray(o.demos) && o.demos.length) rec.demos = o.demos.map(String);
         await safe(() => DB.putBinding(rec));
         Bindings.cache.delete(key);
@@ -5241,12 +5249,14 @@ const Manual = {
     const groups = rec && Array.isArray(rec.rhymes)
       ? rec.rhymes.filter(g => g && Array.isArray(g.words) && g.words.length).map(g => ({ color: Number.isInteger(g.color) ? g.color : 0, words: g.words.map(String) }))
       : [];
-    return { groups, off: !!(rec && rec.rhymesOff) };
+    const hide = rec && Array.isArray(rec.rhymesHide) ? rec.rhymesHide.map(String).filter(Boolean) : [];
+    return { groups, off: !!(rec && rec.rhymesOff), hide };
   },
   async save(d) {
     const rec = Object.assign({}, (await Bindings.get(d.rel)) || {});
     if (d.rhymes && d.rhymes.length) rec.rhymes = d.rhymes; else delete rec.rhymes;
     if (d.rhymesOff) rec.rhymesOff = true; else delete rec.rhymesOff;
+    if (d.rhymesHide && d.rhymesHide.length) rec.rhymesHide = d.rhymesHide; else delete rec.rhymesHide;
     await Bindings.putOrRemove(d.rel, rec);
     renderManualGroups();
   },
@@ -5271,16 +5281,29 @@ const Picker = {
     this.render(); rerenderRhymes();
   },
   clearPicks() { state.picks = []; this.render(); rerenderRhymes(); },
-  // Clear = a blank slate for this lyric: picks, connected groups, and the automatic tints (until restored in Rhyme Rules).
-  async clear() {
+  // Clear = only the picked words: out of their connected groups, and their automatic tint hidden in this lyric.
+  // The words are listed under "This lyric" in Rhyme Rules, each with a restore button.
+  clear() {
+    const d = state.doc; if (!d || !state.picks.length) return;
+    const keys = state.picks.map(p => this.norm(p));
+    for (const g of d.rhymes || []) g.words = g.words.filter(w => !keys.includes(this.norm(w)));
+    d.rhymes = (d.rhymes || []).filter(g => g.words.length);
+    const hide = (d.rhymesHide || []).slice();
+    for (const p of state.picks) if (!hide.some(h => this.norm(h) === this.norm(p))) hide.push(String(p).trim());
+    d.rhymesHide = hide;
+    const n = state.picks.length; state.picks = [];
+    Manual.save(d); this.render(); rerenderRhymes();
+    toast(`${plural(n, 'word')} cleared here · restore in Rhyme Rules`, 2200);
+  },
+  // Clear All = a blank slate for this lyric: picks, connected groups, cleared words, and the automatic tints (until restored in Rhyme Rules).
+  async clearAll() {
     const d = state.doc; if (!d) return;
     const groups = (d.rhymes || []).length;
     if (groups) {
-      const i = await actionSheet({ title: 'Clear all highlights?', message: `Removes ${plural(groups, 'connected group')} and hides automatic rhymes in this lyric.`, actions: [{ label: 'Clear Everything', destructive: true }, { label: 'Clear Picks Only' }] });
+      const i = await actionSheet({ title: 'Clear all highlights?', message: `Removes ${plural(groups, 'connected group')} and hides automatic rhymes in this lyric.`, actions: [{ label: 'Clear Everything', destructive: true }] });
       if (i === null) return;
-      if (i === 1) { this.clearPicks(); return; }
     }
-    state.picks = []; d.rhymes = []; d.rhymesOff = true;
+    state.picks = []; d.rhymes = []; d.rhymesHide = []; d.rhymesOff = true;
     await Manual.save(d); this.render(); rerenderRhymes();
     toast('No highlights in this lyric now · restore them in Rhyme Rules', 3200);
   },
@@ -5304,6 +5327,7 @@ const Picker = {
     const d = state.doc; if (!d || !state.picks.length) return;
     const groups = d.rhymes || [], keys = state.picks.map(p => this.norm(p));
     for (const g of groups) g.words = (g.words || []).filter(w => !keys.includes(this.norm(w)));   // a word lives in one group
+    if (d.rhymesHide && d.rhymesHide.length) d.rhymesHide = d.rhymesHide.filter(h => !keys.includes(this.norm(h)));   // grouping a cleared word shows it again
     let g = groups.find(x => x.color === color);
     if (!g) { g = { color, words: [] }; groups.push(g); }
     g.words = g.words.concat(state.picks.map(p => p.trim()));
@@ -5326,14 +5350,15 @@ const Picker = {
     el.pickbar.hidden = !state.doc || !(n || this.mode);
     el.pickWords.textContent = n ? state.picks.join(' · ') : (this.mode ? 'Tap words to pick them' : 'Ctrl+click words to pick them');
     el.pickUngroup.hidden = !n;
-    el.pickClear.hidden = false;
+    el.pickClear.hidden = !n;
     $$('.pick-swatch', el.pickColors).forEach(b => { b.disabled = !n; });
   },
 };
 function renderManualGroups() {
-  const groups = (state.doc && state.doc.rhymes) || [];
-  el.manualList.innerHTML = groups.map((g, i) => `<li class="cell"><span class="dot" style="--tint:${solidTint(TINTS[g.color % 8])}"></span><div class="txt"><div class="ttl" title="${esc(g.words.join(', '))}">${esc(g.words.join(', '))}</div><div class="sub">Group ${g.color + 1}</div></div><button class="icon-btn cell-more" data-manual-rm="${i}" aria-label="Remove group">${ICONS.xmark}</button></li>`).join('');
-  el.manualEmpty.hidden = groups.length > 0;
+  const groups = (state.doc && state.doc.rhymes) || [], hidden = (state.doc && state.doc.rhymesHide) || [];
+  el.manualList.innerHTML = groups.map((g, i) => `<li class="cell"><span class="dot" style="--tint:${solidTint(TINTS[g.color % 8])}"></span><div class="txt"><div class="ttl" title="${esc(g.words.join(', '))}">${esc(g.words.join(', '))}</div><div class="sub">Group ${g.color + 1}</div></div><button class="icon-btn cell-more" data-manual-rm="${i}" aria-label="Remove group">${ICONS.xmark}</button></li>`).join('')
+    + hidden.map((w, i) => `<li class="cell"><span class="dot off"></span><div class="txt"><div class="ttl" title="${esc(w)}">${esc(w)}</div><div class="sub">Cleared in this lyric</div></div><button class="icon-btn cell-more" data-manual-unhide="${i}" aria-label="Highlight again" title="Highlight again">${ICONS.restore}</button></li>`).join('');
+  el.manualEmpty.hidden = groups.length > 0 || hidden.length > 0;
   el.manualAuto.setAttribute('aria-checked', String(!!state.doc && !state.doc.rhymesOff));
   el.manualAuto.disabled = !state.doc;
 }
@@ -5346,9 +5371,12 @@ el.manualAuto.addEventListener('click', async () => {
 el.pickColors.addEventListener('click', e => { const b = e.target.closest('.pick-swatch'); if (b && !b.disabled) Picker.assign(+b.dataset.c); });
 el.pickUngroup.addEventListener('click', () => Picker.ungroup());
 el.pickClear.addEventListener('click', () => Picker.clear());
+el.pickClearAll.addEventListener('click', () => Picker.clearAll());
 el.pickMode.addEventListener('click', () => Picker.toggleMode());
 el.manualPickMode.addEventListener('click', () => { Sheet.close(); Picker.toggleMode(true); });
 el.manualList.addEventListener('click', async e => {
+  const un = e.target.closest('[data-manual-unhide]');
+  if (un && state.doc) { (state.doc.rhymesHide || []).splice(+un.dataset.manualUnhide, 1); await Manual.save(state.doc); rerenderRhymes(); return; }
   const b = e.target.closest('[data-manual-rm]'); if (!b || !state.doc) return;
   state.doc.rhymes.splice(+b.dataset.manualRm, 1);
   await Manual.save(state.doc); rerenderRhymes();
