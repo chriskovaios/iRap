@@ -65,6 +65,13 @@
   .side-titles .large-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .back-dir { display: inline-flex; font-size: 15px; padding: 2px 6px 2px 0; margin: 0 0 2px -4px; max-width: 100%; }
   .back-dir[hidden] { display: none; }
+  .back-dir:disabled { opacity: .4; cursor: default; background: none; }
+  .crumb-path { display: flex; flex-wrap: wrap; align-items: center; gap: 1px 3px; margin-top: 4px; font-size: 12px; color: var(--label-3); }
+  .crumb { background: none; border: 0; padding: 2px 5px; border-radius: 6px; color: var(--label-2); font: inherit; font-size: 12px; cursor: pointer; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .crumb:hover, .crumb.drop { background: var(--fill-2); }
+  .crumb.current { color: var(--label); font-weight: 600; cursor: default; }
+  .crumb-sep { color: var(--label-3); }
+  html[data-style="graffiti"] .crumb { font-family: var(--font-tag); font-size: 13px; }
   .back-dir span:last-child { overflow: hidden; text-overflow: ellipsis; }
   .cell.folder .ttl { font-weight: 500; }
   .cell.folder .chev svg { width: 16px; height: 16px; color: var(--label-3); }
@@ -577,8 +584,9 @@
   <aside class="sidebar" id="sidebar">
     <div class="side-head">
       <div class="side-titles">
-        <button class="nav-btn back-dir" id="btnUp" hidden><span class="ico" data-icon="back"></span><span>Lyrics</span></button>
+        <button class="nav-btn back-dir" id="btnUp"><span class="ico" data-icon="back"></span><span>Lyrics</span></button>
         <h1 class="large-title" id="sideTitle">Lyrics</h1>
+        <nav class="crumb-path" id="crumbPath" aria-label="Folder path"></nav>
       </div>
       <button class="icon-btn" id="btnNew" title="New lyric or folder (Alt+N for a lyric)" aria-label="New lyric or folder"><span data-icon="plus"></span></button>
     </div>
@@ -1242,6 +1250,11 @@ const FS = {
 
   async pick() {
     const handle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'documents', id: 'lyrics' });
+    await this.adopt(handle);
+    return handle;
+  },
+  // Make a granted directory handle the lyrics root and remember it.
+  async adopt(handle) {
     let folderId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
     const saved = await safe(() => DB.get('folder'));
     if (saved && saved.handle && saved.id && typeof saved.handle.isSameEntry === 'function') {
@@ -1632,6 +1645,40 @@ async function chooseFolder() {
   await enterFolder();
   updateStorageBanner();
 }
+// Going above the lyrics root: the browser cannot hand out a parent, so the picker opens at the current
+// folder and the user chooses one level up (the browser asks for permission). Records move with the lyrics.
+async function chooseParentFolder() {
+  if (!FS.supported) { toast('Folder access needs a Chromium-based browser'); return; }
+  if (FS.isVirtual) { await chooseFolder(); return; }
+  const oldId = FS.folderId, oldHandle = FS.handle, childName = FS.handle.name, wasPath = state.path.slice();
+  saveDraftNow(); await flushSave();
+  let handle;
+  try { handle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: oldHandle, id: 'lyrics' }); }
+  catch (e) { if (!e || e.name !== 'AbortError') { console.warn(e); toast('Could not open that folder'); } return; }
+  let child = null;
+  try { child = await handle.getDirectoryHandle(childName); if (!(await oldHandle.isSameEntry(child))) child = null; } catch { child = null; }
+  await FS.adopt(handle);
+  if (child && FS.folderId !== oldId) await migrateRoot(oldId, FS.folderId, childName);
+  await enterFolder();
+  if (child) { await navigate([childName].concat(wasPath)); toast(`Now browsing “${handle.name}”`, 1800); }
+  updateStorageBanner();
+}
+// Re-key drafts, history and attachments when the root moves one level up.
+async function migrateRoot(oldId, newId, childName) {
+  const lo = `${oldId}/`, hi = lo + VFS_HI;
+  try {
+    for (const b of (await DB.bindingsInRange(lo, hi)) || []) { const rel = b.key.slice(lo.length); await DB.delBinding(b.key); b.key = `${newId}/${childName}/${rel}`; b.name = `${childName}/${rel}`; await DB.putBinding(b); }
+    for (const s of (await DB.snapsInRange(lo, hi)) || []) { const rel = s.file.slice(lo.length); s.file = `${newId}/${childName}/${rel}`; s.name = `${childName}/${rel}`; await DB.putSnap(s); }
+  } catch (e) { console.warn(e); }
+  Bindings.cache.clear(); Snapshots.last.clear();
+  try {
+    const dp = `lyr:draft:${oldId}/`, np = `lyr:draft:${newId}/${childName}/`, keys = [];
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(dp)) keys.push(k); }
+    for (const k of keys) { const v = localStorage.getItem(k); localStorage.removeItem(k); localStorage.setItem(np + k.slice(dp.length), v); }
+  } catch { /* ignore */ }
+  const last = LS.get(`lyr:last:${oldId}`, null);
+  if (typeof last === 'string' && last) LS.set(`lyr:last:${newId}`, `${childName}/${last}`);
+}
 // Shown while lyrics live only in this browser: invite the user to keep them in a real folder where possible.
 function updateStorageBanner() {
   const show = FS.isVirtual && Number(LS.get('lyr:storageBannerUntil', 0)) < Date.now();
@@ -1849,6 +1896,20 @@ const Player = {
       if (!state.doc) { toast('Open a lyric to browse its takes', 1400); this.render(); return; }
       await Demos.refresh();
       this.ensureTakes(Demos.list, state.doc.rel);
+    }
+    // Back to beats: the lyric's attached beat comes first, cued paused, unless a beat is playing right now.
+    if (dir === 'beats' && state.doc) {
+      const cur = this.current(), beatPlaying = !!cur && cur.kind !== 'take' && !this.paused();
+      const rec = beatPlaying ? null : await Bindings.get(state.doc.rel);
+      if (rec && rec.beat) {
+        const i = await this.ensureItem(rec.beat);
+        if (i >= 0) {
+          this.dirMode = 'beats';
+          if (i !== this.idx) await this.play(i, { autoplay: false, seek: rec.time || 0, loopA: rec.loopA, loopB: rec.loopB });
+          if (rec.loopA != null && rec.loopB != null && rec.loopOn !== false && this.loopMode !== 'ab') this.setMode('ab', true); else this.render();
+          return;
+        }
+      }
     }
     this.dirMode = dir;
     const pool = this.pool();
@@ -2881,11 +2942,7 @@ async function ensureTree() {
 }
 function renderList() {
   const q = state.filter.trim().toLowerCase();
-  if (state.sideMode !== 'music') {
-    el.sideTitle.textContent = isRoot() ? 'Lyrics' : state.path[state.path.length - 1];
-    el.btnUp.hidden = isRoot();
-    el.btnUp.lastElementChild.textContent = state.path.length > 1 ? state.path[state.path.length - 2] : 'Lyrics';
-  }
+  if (state.sideMode !== 'music') renderCrumbs('lyrics');
   const snip = rel => (state.snippets.get(rel) || {}).text || '';
   const fileCell = (f, sub) => `<li class="cell${state.doc && state.doc.rel === f.rel ? ' active' : ''}" data-rel="${esc(f.rel)}" role="button" tabindex="0" draggable="true"><div class="txt"><div class="ttl">${esc(stem(f.name))}</div><div class="sub"><b>${esc(fmtDate(f.modified))}</b>${esc(sub)}</div></div></li>`;
   if (q) {
@@ -3288,6 +3345,23 @@ const Beats = {
     await this.load(dir, true);
     setSideMode('music', true);
   },
+  // Go above the music root: pick the parent (permission prompt), then continue inside the folder we came from.
+  async pickParent() {
+    if (!FS.supported) { toast('Browsing folders needs a desktop Chromium browser'); return; }
+    if (!this.handle) { await this.pick(); return; }
+    const old = this.handle, childName = old.name, wasPath = Music.path.slice();
+    let dir;
+    try { dir = await window.showDirectoryPicker({ mode: 'read', startIn: old, id: 'beats' }); }
+    catch (e) { if (!e || e.name !== 'AbortError') { console.warn(e); toast('Could not open that folder'); } return; }
+    let child = null;
+    try { child = await dir.getDirectoryHandle(childName); if (!(await old.isSameEntry(child))) child = null; } catch { child = null; }
+    this.saved = { handle: dir, name: dir.name };
+    await safe(() => DB.set('beats', this.saved));
+    this.handle = dir; this.needsReopen = false;
+    Music.reset(); LS.set('lyr:musicPath', child ? [childName].concat(wasPath) : []);
+    await this.load(dir, true);
+    setSideMode('music', true);
+  },
   async restore() {
     const saved = await safe(() => Promise.race([DB.get('beats'), new Promise(res => setTimeout(() => res(null), 8000))]));
     if (!saved || !saved.handle || typeof saved.handle.queryPermission !== 'function') return;
@@ -3497,9 +3571,7 @@ const Music = {
   render() {
     if (state.sideMode !== 'music') return;
     const q = state.filter.trim().toLowerCase(), hit = s => !q || String(s).toLowerCase().includes(q);
-    el.sideTitle.textContent = this.path.length ? this.path[this.path.length - 1] : 'Music';
-    el.btnUp.hidden = !this.path.length;
-    el.btnUp.lastElementChild.textContent = this.path.length > 1 ? this.path[this.path.length - 2] : 'Music';
+    renderCrumbs('music');
     el.musicFolderName.textContent = Beats.handle ? Beats.handle.name : Beats.needsReopen ? 'Reopen music folder' : 'Choose Music Folder…';
     const cur = Player.current(), playing = !Player.paused();
     const stateIcon = fallback => (playing ? ICONS.pause : ICONS.play) || fallback;
@@ -3916,7 +3988,30 @@ el.fileList.addEventListener('contextmenu', e => {
   e.preventDefault();
   folderMenu(c, c.dataset.dir);
 });
-el.btnUp.addEventListener('click', () => { if (state.sideMode === 'music') Music.up(); else navigate(state.path.slice(0, -1)); });
+// Sidebar header: back button plus a breadcrumb trail. At the top of a folder, "back" means picking the parent folder.
+function renderCrumbs(mode) {
+  const music = mode === 'music';
+  const path = music ? Music.path : state.path;
+  const rootName = music ? (Beats.handle ? Beats.handle.name : 'Music') : (FS.handle ? (FS.isVirtual ? 'On this device' : FS.handle.name) : 'Lyrics');
+  const canParent = FS.supported && (music ? !!Beats.handle : (!!FS.handle && !FS.isVirtual));
+  el.sideTitle.textContent = path.length ? path[path.length - 1] : (music ? 'Music' : 'Lyrics');
+  el.btnUp.hidden = false;
+  el.btnUp.disabled = !path.length && !canParent;
+  el.btnUp.lastElementChild.textContent = path.length ? (path.length > 1 ? path[path.length - 2] : rootName) : (canParent ? 'Parent folder…' : (music ? 'Music' : 'Lyrics'));
+  el.btnUp.title = path.length ? 'Back one folder' : canParent ? 'Go above this folder; the browser will ask for permission' : '';
+  const segs = [rootName].concat(path);
+  el.crumbPath.innerHTML = segs.map((label, i) => `${i ? '<span class="crumb-sep">›</span>' : ''}<button class="crumb${i === segs.length - 1 ? ' current' : ''}" data-crumb="${i}" title="${esc(label)}">${esc(label)}</button>`).join('');
+}
+el.btnUp.addEventListener('click', () => {
+  if (state.sideMode === 'music') { if (Music.path.length) Music.up(); else Beats.pickParent(); }
+  else if (state.path.length) navigate(state.path.slice(0, -1));
+  else chooseParentFolder();
+});
+el.crumbPath.addEventListener('click', e => {
+  const b = e.target.closest('[data-crumb]'); if (!b || b.classList.contains('current')) return;
+  const n = +b.dataset.crumb;
+  if (state.sideMode === 'music') Music.navigate(Music.path.slice(0, n)); else navigate(state.path.slice(0, n));
+});
 // Drag a lyric onto a folder (or onto the back button) to move it there.
 el.fileList.addEventListener('dragstart', e => {
   const c = e.target.closest('.cell[data-rel]'); if (!c) return;
@@ -3924,7 +4019,7 @@ el.fileList.addEventListener('dragstart', e => {
   try { e.dataTransfer.setData('text/plain', c.dataset.rel); e.dataTransfer.effectAllowed = 'move'; } catch { /* ignore */ }
 });
 el.fileList.addEventListener('dragend', () => { state.dragRel = null; $$('.drop', el.sidebar).forEach(x => x.classList.remove('drop')); });
-const dropTarget = e => e.target.closest('.cell.folder, #btnUp');
+const dropTarget = e => (state.sideMode === 'music' ? null : e.target.closest('.cell.folder, #btnUp, .crumb:not(.current)'));
 el.sidebar.addEventListener('dragover', e => {
   if (!state.dragRel) return;
   const t = dropTarget(e); if (!t) return;
@@ -3939,7 +4034,8 @@ el.sidebar.addEventListener('drop', e => {
   e.preventDefault(); e.stopPropagation();
   t.classList.remove('drop');
   const rel = state.dragRel; state.dragRel = null;
-  moveFile(rel, t.id === 'btnUp' ? state.path.slice(0, -1) : state.path.concat(t.dataset.dir));
+  const dest = t.id === 'btnUp' ? state.path.slice(0, -1) : t.dataset.crumb != null ? state.path.slice(0, +t.dataset.crumb) : state.path.concat(t.dataset.dir);
+  moveFile(rel, dest);
 });
 el.trashList.addEventListener('click', e => { const c = e.target.closest('.cell'); if (c) trashActions(c.dataset.trash); });
 el.trashList.addEventListener('keydown', e => {
