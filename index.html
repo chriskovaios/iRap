@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src blob: mediastream:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://www.youtube.com; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src blob: mediastream:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://www.youtube.com https://w.soundcloud.com; base-uri 'none'; form-action 'none'">
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -626,13 +626,14 @@
         <p class="group-note" id="musicEmpty" hidden></p>
         <div class="btn-row" id="musicActions" hidden><button class="btn secondary" id="musicChoose">Choose Music Folder…</button></div>
       </section>
-      <section class="group" id="musicPlaylistGroup" hidden>
-        <div class="group-head static"><span>Playlist</span><span class="group-hint">hold and drag to reorder</span></div>
-        <ul class="inset" id="musicPlaylist"></ul>
-      </section>
       <section class="group" id="musicTakesGroup" hidden>
         <div class="group-head static"><span id="musicTakesTitle">Takes</span></div>
         <ul class="inset" id="musicTakes"></ul>
+      </section>
+      <section class="group" id="musicPlaylistGroup">
+        <div class="group-head static"><span>Playlist <span class="group-hint">hold and drag to reorder</span></span><button class="icon-btn" id="musicAddLink" aria-label="Add a YouTube or SoundCloud link" title="Add a YouTube or SoundCloud link"><span data-icon="plus"></span></button></div>
+        <ul class="inset" id="musicPlaylist"></ul>
+        <p class="group-note" id="musicPlaylistEmpty">Paste YouTube or SoundCloud links with +, or add audio files.</p>
       </section>
     </div>
     <div class="list-scroll" id="listScroll">
@@ -859,8 +860,8 @@
       <button class="btn secondary" id="plCapture">Capture System Audio</button>
     </div>
     <p class="about" id="plFolderNote" hidden></p>
-    <form class="yt-form" id="ytForm"><input type="text" id="ytInput" placeholder="Paste a YouTube link" autocomplete="off" spellcheck="false" aria-label="YouTube link"><button class="small-btn" type="submit">Add</button></form>
-    <p class="about">YouTube videos play in their own player above and join the playlist. The browser cannot analyze their sound, so for visuals and a live waveform turn on Capture System Audio while a video plays.</p>
+    <form class="yt-form" id="ytForm"><input type="text" id="ytInput" placeholder="Paste a YouTube or SoundCloud link" autocomplete="off" spellcheck="false" aria-label="YouTube or SoundCloud link"><button class="small-btn" type="submit">Add</button></form>
+    <p class="about">YouTube videos and SoundCloud tracks play in their own player above and join the playlist; rename a link from its … menu. The browser cannot analyze their sound, so for visuals and a live waveform turn on Capture System Audio while one plays.</p>
     <p class="about">System capture uses the browser’s share dialog: choose “Entire screen” and turn on “Share system audio”. The sound is analyzed for the visuals only, not played back.</p>
   </div>
 </section>
@@ -1853,8 +1854,13 @@ function parseYouTube(text) {
   if (m) return m[1];
   return /^[A-Za-z0-9_-]{11}$/.test(s) ? s : null;
 }
+function parseSoundCloud(text) {
+  const m = String(text || '').trim().match(/^https?:\/\/(?:(?:www|m|on)\.)?soundcloud\.com\/[^\s?#]+/i);
+  return m ? m[0].replace(/\/+$/, '') : null;
+}
 const YT = {
   iframe: null, ready: false, state: -1, cur: 0, dur: 0, videoId: null, wantPlay: false,
+  get key() { return this.videoId; },
   get playing() { return this.state === 1 || this.state === 3; },
   ensureFrame() {
     if (this.iframe) return this.iframe;
@@ -1906,7 +1912,7 @@ const YT = {
       if (typeof i.playerState === 'number') this.setState(i.playerState);
       if (i.videoData && i.videoData.title) {
         const it = Player.items.find(x => x.kind === 'yt' && x.id === this.videoId);
-        if (it && it.name !== i.videoData.title) { it.name = i.videoData.title; Player.saveLinks(); Player.render(); }
+        if (it && !it.custom && it.name !== i.videoData.title) { it.name = i.videoData.title; Player.saveLinks(); Player.render(); }
       }
       Player.tick(); Wave.draw();
     }
@@ -1920,9 +1926,83 @@ const YT = {
 };
 addEventListener('message', e => YT.onMessage(e));
 
+/* SoundCloud: the official embedded widget, driven through its message protocol (no external script). */
+const SC = {
+  iframe: null, ready: false, playingFlag: false, cur: 0, dur: 0, url: null, wantPlay: false, pendingSeek: 0,
+  get key() { return this.url; },
+  get playing() { return this.playingFlag; },
+  ensureFrame() {
+    if (this.iframe) return this.iframe;
+    const f = document.createElement('iframe');
+    f.allow = 'autoplay; encrypted-media';
+    f.title = 'SoundCloud player';
+    el.ytBox.appendChild(f);
+    this.iframe = f;
+    return f;
+  },
+  load(url, autoplay, start) {
+    const f = this.ensureFrame();
+    this.url = url; this.ready = false; this.playingFlag = false; this.cur = start > 0 ? start : 0; this.dur = 0; this.wantPlay = !!autoplay; this.pendingSeek = start > 0 ? start : 0;
+    const accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ff5500').replace('#', '');
+    const params = new URLSearchParams({ url, auto_play: autoplay ? 'true' : 'false', visual: 'false', show_artwork: 'true', color: accent, buying: 'false', sharing: 'false', download: 'false', show_playcount: 'false', show_comments: 'false', show_teaser: 'false', hide_related: 'true' });
+    f.src = `https://w.soundcloud.com/player/?${params.toString()}`;
+    el.ytPane.hidden = false;
+  },
+  destroy() {
+    if (this.iframe) { try { this.iframe.src = 'about:blank'; } catch { /* ignore */ } this.iframe.remove(); this.iframe = null; }
+    this.url = null; this.ready = false; this.playingFlag = false; this.cur = 0; this.dur = 0; this.wantPlay = false;
+    el.ytPane.hidden = true;
+  },
+  hide() { this.destroy(); },
+  post(method, value) {
+    if (!this.iframe || !this.iframe.contentWindow) return;
+    try { this.iframe.contentWindow.postMessage(JSON.stringify(value === undefined ? { method } : { method, value }), 'https://w.soundcloud.com'); } catch { /* ignore */ }
+  },
+  play() { this.wantPlay = true; this.post('play'); },
+  pause() { this.wantPlay = false; this.post('pause'); },
+  seek(t) { this.cur = t; this.post('seekTo', Math.round(t * 1000)); },
+  setVolume(v) { this.post('setVolume', v); },
+  onMessage(e) {
+    if (!this.iframe || e.source !== this.iframe.contentWindow) return;
+    if (!/(^|\.)soundcloud\.com$/.test(String(e.origin).replace(/^https?:\/\//, ''))) return;
+    let d; try { d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+    if (!d || typeof d !== 'object') return;
+    const v = d.value;
+    switch (d.method) {
+      case 'ready':
+        this.ready = true; this.setVolume(settings.volume); this.post('getDuration'); this.post('getCurrentSound');
+        if (this.pendingSeek > 0) { this.seek(this.pendingSeek); this.pendingSeek = 0; }
+        if (this.wantPlay) this.play();
+        Player.render(); break;
+      case 'play': this.setPlaying(true); break;
+      case 'pause': this.setPlaying(false); break;
+      case 'finish': this.setPlaying(false); Player.onEnded(); break;
+      case 'playProgress':
+        if (v && typeof v.currentPosition === 'number') { this.cur = v.currentPosition / 1000; if (!this.dur && v.relativePosition > 0) this.dur = v.currentPosition / v.relativePosition / 1000; }
+        Player.tick(); Wave.draw(); break;
+      case 'getDuration': if (typeof v === 'number' && v > 0) this.dur = v / 1000; Wave.draw(); break;
+      case 'getPosition': if (typeof v === 'number') this.cur = v / 1000; break;
+      case 'getCurrentSound':
+        if (v && typeof v === 'object') {
+          if (v.duration) this.dur = v.duration / 1000;
+          const it = Player.items.find(x => x.kind === 'sc' && x.url === this.url);
+          if (it && !it.custom && v.title && it.name !== v.title) { it.name = v.user && v.user.username ? `${v.user.username} · ${v.title}` : v.title; Player.saveLinks(); Player.render(); }
+        }
+        break;
+      default: break;
+    }
+  },
+  setPlaying(p) {
+    if (p === this.playingFlag) return;
+    this.playingFlag = p; Player.render();
+    if (p) Wave.tick(); else Loops.save(Player.current());
+  },
+};
+addEventListener('message', e => SC.onMessage(e));
+
 /* Per-song memory: loop points, whether the loop is active, and the last position. */
 const Loops = {
-  key(it) { return it ? (it.kind === 'yt' ? `yt:${it.id}` : `file:${it.name}`) : null; },
+  key(it) { return it ? (it.kind === 'yt' ? `yt:${it.id}` : it.kind === 'sc' ? `sc:${it.url}` : `file:${it.name}`) : null; },
   all() { const v = LS.get('lyr:loops', {}); return v && typeof v === 'object' ? v : {}; },
   get(it) { const k = this.key(it); return k ? (this.all()[k] || null) : null; },
   save(it) {
@@ -2026,31 +2106,65 @@ const Player = {
   },
   isAudioName: n => /\.(mp3|wav|m4a|aac|ogg|oga|flac|webm|opus|aiff?)$/i.test(n),
   current() { return this.items[this.idx] || null; },
-  isYT() { const it = this.current(); return !!it && it.kind === 'yt'; },
-  paused() { return this.isYT() ? !YT.playing : el.audio.paused; },
-  time() { return this.isYT() ? YT.cur : (el.audio.currentTime || 0); },
-  duration() { const d = this.isYT() ? YT.dur : el.audio.duration; return isFinite(d) && d > 0 ? d : 0; },
-  seek(t) { const d = this.duration(); const v = clamp(t, 0, d || t); if (this.isYT()) YT.seek(v); else el.audio.currentTime = v; },
+  // Web items (YouTube, SoundCloud) play in an embedded player; everything else through the audio element.
+  isWebItem(it) { return !!it && (it.kind === 'yt' || it.kind === 'sc'); },
+  isWeb() { return this.isWebItem(this.current()); },
+  webFor(it) { return it && it.kind === 'sc' ? SC : YT; },
+  web() { return this.webFor(this.current()); },
+  linkKey(it) { return it ? (it.kind === 'sc' ? it.url : it.id) : null; },
+  paused() { return this.isWeb() ? !this.web().playing : el.audio.paused; },
+  time() { return this.isWeb() ? this.web().cur : (el.audio.currentTime || 0); },
+  duration() { const d = this.isWeb() ? this.web().dur : el.audio.duration; return isFinite(d) && d > 0 ? d : 0; },
+  seek(t) { const d = this.duration(); const v = clamp(t, 0, d || t); if (this.isWeb()) this.web().seek(v); else el.audio.currentTime = v; },
   onEnded() {
     const mode = this.loopMode;
     if (mode === 'off') { this.render(); return; }
     if (mode === 'folder' && this.pool().length > 1) { this.next(); return; }   // stays within beats, or within this lyric's takes
     this.seek(mode === 'ab' && this.loopA != null ? this.loopA : 0);
-    if (this.isYT()) YT.play(); else el.audio.play().catch(() => {});
+    if (this.isWeb()) this.web().play(); else el.audio.play().catch(() => {});
   },
   addLink(text) {
-    const id = parseYouTube(text);
-    if (!id) { toast('That does not look like a YouTube link'); return false; }
-    let i = this.items.findIndex(x => x.kind === 'yt' && x.id === id);
-    if (i < 0) { this.items.push({ kind: 'yt', id, name: 'YouTube video', file: null, handle: null }); i = this.items.length - 1; this.saveLinks(); }
+    const id = parseYouTube(text), url = id ? null : parseSoundCloud(text);
+    if (!id && !url) { toast('That does not look like a YouTube or SoundCloud link', 2600); return false; }
+    let i = this.items.findIndex(x => id ? (x.kind === 'yt' && x.id === id) : (x.kind === 'sc' && x.url === url));
+    if (i < 0) {
+      this.items.push(id ? { kind: 'yt', id, name: 'YouTube video', file: null, handle: null, custom: false } : { kind: 'sc', url, name: url.replace(/^https?:\/\/(?:[^/]+\/)/, '').replace(/[-_]+/g, ' '), file: null, handle: null, custom: false });
+      i = this.items.length - 1; this.saveLinks();
+    }
     this.play(i);
     return true;
   },
-  saveLinks() { LS.set('lyr:yt', this.items.filter(x => x.kind === 'yt').map(x => ({ id: x.id, name: x.name }))); SettingsFile.schedule(); },
+  saveLinks() {
+    LS.set('lyr:links', this.items.filter(x => x.kind === 'yt' || x.kind === 'sc').map(x => ({ kind: x.kind, id: x.id, url: x.url, name: x.name, custom: !!x.custom })));
+    SettingsFile.schedule();
+  },
   loadLinks() {
-    const saved = LS.get('lyr:yt', []);
-    if (!Array.isArray(saved)) return;
-    for (const s of saved) if (s && /^[A-Za-z0-9_-]{11}$/.test(s.id || '')) this.items.push({ kind: 'yt', id: s.id, name: String(s.name || 'YouTube video'), file: null, handle: null });
+    let saved = LS.get('lyr:links', null);
+    if (!Array.isArray(saved)) saved = (LS.get('lyr:yt', []) || []).map(s => Object.assign({ kind: 'yt' }, s));   // older builds kept YouTube links only
+    for (const s of saved) {
+      if (!s) continue;
+      if (s.kind === 'sc' && parseSoundCloud(s.url)) this.items.push({ kind: 'sc', url: parseSoundCloud(s.url), name: String(s.name || 'SoundCloud track'), file: null, handle: null, custom: !!s.custom });
+      else if (/^[A-Za-z0-9_-]{11}$/.test(s.id || '')) this.items.push({ kind: 'yt', id: s.id, name: String(s.name || 'YouTube video'), file: null, handle: null, custom: !!s.custom });
+    }
+  },
+  async renameItem(i) {
+    const it = this.items[i]; if (!it || !this.isWebItem(it)) return;
+    const v = await alertPrompt({ title: 'Rename Link', message: 'The name shown in the playlist and on the toolbar.', value: it.name, ok: 'Rename' });
+    if (v == null) return;
+    const name = v.trim();
+    if (!name) { it.custom = false; if (it.kind === 'sc') SC.post('getCurrentSound'); it.name = it.kind === 'sc' ? 'SoundCloud track' : 'YouTube video'; }
+    else { it.name = name; it.custom = true; }
+    this.saveLinks(); this.render();
+  },
+  linkMenu(anchor, i) {
+    const it = this.items[i]; if (!it) return;
+    const href = it.kind === 'sc' ? it.url : `https://www.youtube.com/watch?v=${encodeURIComponent(it.id)}`;
+    Menu.open(anchor, [
+      { label: 'Rename…', icon: 'pencil', onClick: () => this.renameItem(i) },
+      { label: it.kind === 'sc' ? 'Open on SoundCloud' : 'Open on YouTube', icon: 'screen', onClick: () => window.open(href, '_blank', 'noopener') },
+      { label: 'Copy link', icon: 'copy', onClick: async () => { try { await navigator.clipboard.writeText(href); toast('Link copied', 1200); } catch { toast(href, 4000); } } },
+      { label: 'Remove from playlist', icon: 'trash', destructive: true, onClick: () => this.removeItem(i) },
+    ]);
   },
   add(files) {
     const wasEmpty = this.items.length === 0;
@@ -2087,16 +2201,17 @@ const Player = {
     this.loopB = opts.loopB != null ? opts.loopB : (saved.b != null ? saved.b : null);
     const seek = 'seek' in opts ? opts.seek : saved.t;
     this.pendingSeek = seek > 0 ? seek : null;
-    if (it.kind === 'yt') {
+    if (this.isWebItem(it)) {
       el.audio.pause();
       this.fallbackId = null; this.ytNote('');
-      if (!/^https?:$/.test(location.protocol)) { this.ytFallback(it, 'This video can only be watched on YouTube from here.'); return; }
-      YT.load(it.id, autoplay, this.pendingSeek || 0);
+      if (it.kind === 'yt' && !/^https?:$/.test(location.protocol)) { this.ytFallback(it, 'This video can only be watched on YouTube from here.'); return; }
+      (it.kind === 'sc' ? YT : SC).destroy();   // one embedded player at a time
+      this.webFor(it).load(this.linkKey(it), autoplay, this.pendingSeek || 0);
       this.pendingSeek = null;
       this.render();
       return;
     }
-    YT.hide();
+    YT.destroy(); SC.destroy();
     Sound.stopCapture();
     Sound.connectPlayer();
     try { if (!it.file) it.file = await it.handle.getFile(); }
@@ -2124,7 +2239,12 @@ const Player = {
     if (!beat) return -1;
     if (beat.kind === 'yt') {
       let i = this.items.findIndex(x => x.kind === 'yt' && x.id === beat.id);
-      if (i < 0) { this.items.push({ kind: 'yt', id: beat.id, name: beat.name || 'YouTube video', file: null, handle: null }); i = this.items.length - 1; this.saveLinks(); }
+      if (i < 0) { this.items.push({ kind: 'yt', id: beat.id, name: beat.name || 'YouTube video', file: null, handle: null, custom: false }); i = this.items.length - 1; this.saveLinks(); }
+      return i;
+    }
+    if (beat.kind === 'sc') {
+      let i = this.items.findIndex(x => x.kind === 'sc' && x.url === beat.url);
+      if (i < 0) { this.items.push({ kind: 'sc', url: beat.url, name: beat.name || 'SoundCloud track', file: null, handle: null, custom: false }); i = this.items.length - 1; this.saveLinks(); }
       return i;
     }
     let i = this.items.findIndex(x => x.kind !== 'yt' && x.name === beat.name);
@@ -2141,21 +2261,21 @@ const Player = {
   },
   toggle() {
     if (this.idx < 0) { if (this.items.length) this.play(0); else Sheet.open('player'); return; }
-    if (this.isYT()) {
-      const it = this.current();
-      if (this.fallbackId === it.id) { Sheet.open('player'); return; }
-      if (!YT.iframe || YT.videoId !== it.id) { this.play(this.idx); return; }   // frame was torn down: rebuild and play
-      if (YT.playing) YT.pause(); else YT.play();
+    if (this.isWeb()) {
+      const it = this.current(), w = this.web();
+      if (this.fallbackId === this.linkKey(it)) { Sheet.open('player'); return; }
+      if (!w.iframe || w.key !== this.linkKey(it)) { this.play(this.idx); return; }   // frame was torn down: rebuild and play
+      if (w.playing) w.pause(); else w.play();
       return;
     }
     Sound.ensure();
     if (el.audio.paused) el.audio.play().catch(() => {}); else el.audio.pause();
   },
-  pauseAll() { el.audio.pause(); if (YT.playing) YT.pause(); },
+  pauseAll() { el.audio.pause(); if (YT.playing) YT.pause(); if (SC.playing) SC.pause(); },
   fallbackId: null,
   // Shown when a video cannot play embedded: title, reason, and a button to watch it on YouTube.
   ytFallback(it, msg) {
-    this.fallbackId = it ? it.id : null;
+    this.fallbackId = this.linkKey(it);
     el.ytFbTitle.textContent = it ? it.name : '';
     el.ytFbMsg.textContent = msg || '';
     this.render();
@@ -2192,10 +2312,12 @@ const Player = {
   render() {
     const it = this.items[this.idx];
     const playing = !!it && !this.paused();
-    const fb = !!(it && it.kind === 'yt' && this.fallbackId === it.id);
-    el.ytPane.hidden = !(it && it.kind === 'yt' && (fb || (YT.iframe && YT.videoId === it.id)));
+    const web = this.isWebItem(it), w = web ? this.webFor(it) : null, key = this.linkKey(it);
+    const fb = !!(web && this.fallbackId === key);
+    el.ytPane.hidden = !(web && (fb || (w.iframe && w.key === key)));
     el.ytFallback.hidden = !fb;
     el.ytBox.hidden = fb;
+    el.ytWatch.textContent = it && it.kind === 'sc' ? 'Open on SoundCloud' : 'Watch on YouTube';
     const rec = state.doc ? Bindings.cache.get(Bindings.key(state.doc.rel)) : null;
     const attached = !!(rec && rec.beat && it && Bindings.matches(rec, it));
     el.tbTrack.dataset.attached = String(attached);
@@ -2235,9 +2357,10 @@ const Player = {
     const pool = this.pool();
     el.plList.innerHTML = pool.map(i => {
       const x = this.items[i];
-      const icon = x.kind === 'yt' ? ICONS.screen : x.kind === 'take' ? ICONS.mic : ICONS.music;
-      const sub = x.kind === 'yt' ? '<div class="sub">YouTube</div>' : x.kind === 'take' ? '<div class="sub">Take</div>' : '';
-      const rm = !x.fromFolder ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button>` : '';
+      const icon = x.kind === 'yt' ? ICONS.screen : x.kind === 'sc' ? ICONS.wave : x.kind === 'take' ? ICONS.mic : ICONS.music;
+      const sub = x.kind === 'yt' ? '<div class="sub">YouTube</div>' : x.kind === 'sc' ? '<div class="sub">SoundCloud</div>' : x.kind === 'take' ? '<div class="sub">Take</div>' : '';
+      const rm = this.isWebItem(x) ? `<button class="icon-btn cell-more" data-linkmore="${i}" aria-label="Link options" title="Rename, open, copy or remove">${ICONS.more}</button>`
+        : !x.fromFolder ? `<button class="icon-btn" data-remove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button>` : '';
       return `<li class="cell pl-cell${i === this.idx ? ' active' : ''}" data-i="${i}"><span class="ico">${icon}</span><div class="txt"><div class="ttl" title="${esc(x.name)}">${esc(x.name)}</div>${sub}</div>${rm}</li>`;
     }).join('');
     el.plEmpty.hidden = pool.length > 0;
@@ -2258,9 +2381,9 @@ const Player = {
   },
   removeItem(i) {
     const it = this.items[i]; if (!it || it.fromFolder) return;   // folder tracks come and go with the browsed folder
-    if (i === this.idx) { this.pauseAll(); YT.hide(); this.idx = -1; } else if (i < this.idx) this.idx--;
+    if (i === this.idx) { this.pauseAll(); YT.destroy(); SC.destroy(); this.idx = -1; } else if (i < this.idx) this.idx--;
     this.items.splice(i, 1);
-    if (it.kind === 'yt') this.saveLinks();
+    if (this.isWebItem(it)) this.saveLinks();
     this.render(); Wave.draw(true);
   },
   // New order for the hand-added files and links (indices as rendered); folder tracks and takes keep their place.
@@ -2281,7 +2404,7 @@ el.ytForm.addEventListener('submit', e => {
 });
 el.audio.addEventListener('timeupdate', () => Player.renderTime());
 el.audio.addEventListener('loadedmetadata', () => {
-  if (Player.pendingSeek != null && !Player.isYT()) {
+  if (Player.pendingSeek != null && !Player.isWeb()) {
     const d = el.audio.duration;
     el.audio.currentTime = isFinite(d) && d > 0 ? Math.min(Player.pendingSeek, Math.max(0, d - .5)) : Player.pendingSeek;
     Player.pendingSeek = null;
@@ -2298,8 +2421,8 @@ el.tbPlay.addEventListener('click', () => Player.toggle());
 el.tbTrack.addEventListener('click', () => { if (Beats.needsReopen && Player.idx < 0 && !Sound.capturing) Beats.reopen(false); else Sheet.open('player'); });
 el.plReopenBeats.addEventListener('click', () => Beats.reopen(false));
 el.ytWatch.addEventListener('click', () => {
-  const it = Player.current(); if (!it || it.kind !== 'yt') return;
-  window.open(`https://www.youtube.com/watch?v=${encodeURIComponent(it.id)}`, '_blank', 'noopener');
+  const it = Player.current(); if (!Player.isWebItem(it)) return;
+  window.open(it.kind === 'sc' ? it.url : `https://www.youtube.com/watch?v=${encodeURIComponent(it.id)}`, '_blank', 'noopener');
 });
 el.plPrev.addEventListener('click', () => Player.prev());
 el.plNext.addEventListener('click', () => Player.next());
@@ -2318,6 +2441,8 @@ el.plLoopMode.addEventListener('click', e => {
   Player.setMode(b.dataset.mode, true);
 });
 el.plList.addEventListener('click', e => {
+  const lm = e.target.closest('[data-linkmore]');
+  if (lm) { e.stopPropagation(); Player.linkMenu(lm, +lm.dataset.linkmore); return; }
   const rm = e.target.closest('[data-remove]');
   if (rm) { e.stopPropagation(); Player.removeItem(+rm.dataset.remove); return; }
   const c = e.target.closest('.pl-cell'); if (c) Player.play(+c.dataset.i);
@@ -3069,7 +3194,7 @@ async function openRel(rel, opts) {
 async function openFile(entry, opts = {}) {
   if (state.doc && state.doc.rel === entry.rel && !opts.force) { showDoc(); if (state.editing && innerWidth > 760) el.ta.focus(); return; }
   if (state.doc && !opts.force) Bindings.saveState(state.doc);
-  if (!opts.force) { Loops.save(Player.current()); Player.pauseAll(); YT.destroy(); Player.pruneTakes(entry.rel); Player.render(); }
+  if (!opts.force) { Loops.save(Player.current()); Player.pauseAll(); YT.destroy(); SC.destroy(); Player.pruneTakes(entry.rel); Player.render(); }
   saveDraftNow(); await flushSave();
   let disk;
   try { disk = await FS.read(entry.handle); } catch (e) { handleFsError(e); return; }
@@ -3523,13 +3648,14 @@ const Bindings = {
   matches(rec, it) {
     const b = rec && rec.beat; if (!b || !it) return false;
     if (b.kind === 'yt') return it.kind === 'yt' && it.id === b.id;
-    return it.kind !== 'yt' && it.name === b.name;
+    if (b.kind === 'sc') return it.kind === 'sc' && it.url === b.url;
+    return it.kind !== 'yt' && it.kind !== 'sc' && it.name === b.name;
   },
   async attachCurrent() {
     const d = state.doc, it = Player.current();
     if (!d) { toast('Open a lyric first'); return; }
     if (!it) { toast('Play a beat first, then attach it'); return; }
-    const beat = it.kind === 'yt' ? { kind: 'yt', id: it.id, name: it.name } : { kind: 'file', name: it.name, handle: it.handle || null };
+    const beat = it.kind === 'yt' ? { kind: 'yt', id: it.id, name: it.name } : it.kind === 'sc' ? { kind: 'sc', url: it.url, name: it.name } : { kind: 'file', name: it.name, handle: it.handle || null };
     await this.put(d.rel, Object.assign({}, (await this.get(d.rel)) || {}, { beat, time: Player.time(), loopA: Player.loopA, loopB: Player.loopB, loopOn: Player.loopOn, bpm: settings.metroBpm }));
     Player.render();
     toast(`Attached “${it.name}” to “${stem(d.name)}”`, 2200);
@@ -3669,10 +3795,14 @@ const Music = {
     // Playlist: added files and links, not the browsed folder and not takes
     const extra = []; Player.items.forEach((it, i) => { if (!it.fromFolder && it.kind !== 'take' && hit(it.name)) extra.push({ it, i }); });
     el.musicPlaylist.innerHTML = extra.map(({ it, i }) => {
-      const active = it === cur, sub = it.kind === 'yt' ? 'YouTube' : it.folderPath != null ? (it.folderPath || (Beats.handle ? Beats.handle.name : 'Music folder')) : 'File';
-      return `<li class="cell${active ? ' active' : ''}" data-mitem="${i}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : it.kind === 'yt' ? ICONS.screen : ICONS.music}</span><div class="txt"><div class="ttl" title="${esc(it.name)}">${esc(it.name)}</div><div class="sub">${esc(sub)}</div></div><button class="icon-btn cell-more" data-mremove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button></li>`;
+      const active = it === cur, sub = it.kind === 'yt' ? 'YouTube' : it.kind === 'sc' ? 'SoundCloud' : it.folderPath != null ? (it.folderPath || (Beats.handle ? Beats.handle.name : 'Music folder')) : 'File';
+      const icon = active ? stateIcon() : it.kind === 'yt' ? ICONS.screen : it.kind === 'sc' ? ICONS.wave : ICONS.music;
+      const more = Player.isWebItem(it)
+        ? `<button class="icon-btn cell-more" data-mlink="${i}" aria-label="Link options" title="Rename, open, copy or remove">${ICONS.more}</button>`
+        : `<button class="icon-btn cell-more" data-mremove="${i}" aria-label="Remove from playlist" title="Remove from playlist">${ICONS.xmark}</button>`;
+      return `<li class="cell${active ? ' active' : ''}" data-mitem="${i}" role="button" tabindex="0"><span class="ico">${icon}</span><div class="txt"><div class="ttl" title="${esc(it.name)}">${esc(it.name)}</div><div class="sub">${esc(sub)}</div></div>${more}</li>`;
     }).join('');
-    el.musicPlaylistGroup.hidden = !extra.length;
+    el.musicPlaylistEmpty.hidden = extra.length > 0 || !!q;
     // Folder browser
     if (!Beats.handle) {
       el.musicList.innerHTML = '';
@@ -3705,6 +3835,7 @@ const Music = {
 el.sideMode.addEventListener('click', e => { const b = e.target.closest('button[data-mode]'); if (b) setSideMode(b.dataset.mode, true); });
 el.musicScroll.addEventListener('click', e => {
   const more = e.target.closest('[data-mmore]'); if (more) { e.stopPropagation(); Music.trackMenu(more, more.dataset.mmore); return; }
+  const lm = e.target.closest('[data-mlink]'); if (lm) { e.stopPropagation(); Player.linkMenu(lm, +lm.dataset.mlink); return; }
   const rm = e.target.closest('[data-mremove]'); if (rm) { e.stopPropagation(); Player.removeItem(+rm.dataset.mremove); return; }
   const c = e.target.closest('.cell'); if (!c) return;
   if (c.dataset.mdir != null) Music.navigate(Music.path.concat(c.dataset.mdir));
@@ -3715,6 +3846,12 @@ el.musicScroll.addEventListener('click', e => {
 el.musicScroll.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const c = e.target.closest('.cell'); if (c && !e.target.closest('button')) { e.preventDefault(); c.click(); } } });
 el.musicScroll.addEventListener('contextmenu', e => { const c = e.target.closest('.cell.track'); if (!c) return; e.preventDefault(); Music.trackMenu(c, c.dataset.mtrack); });
 el.musicChoose.addEventListener('click', () => (Beats.needsReopen ? Beats.reopen(false) : Beats.pick()));
+// Add a web link from anywhere: the sidebar's + in the Playlist header, the + menu, or the Beat sheet's field.
+async function promptLink() {
+  const v = await alertPrompt({ title: 'Add Link', message: 'A YouTube or SoundCloud link. It joins the playlist and starts playing.', placeholder: 'https://…', ok: 'Add' });
+  if (v && v.trim()) Player.addLink(v.trim());
+}
+el.musicAddLink.addEventListener('click', promptLink);
 el.btnMusicFolder.addEventListener('click', async () => {
   if (!FS.supported) { toast('Browsing a music folder needs a desktop Chromium browser', 2600); return; }
   if (Beats.needsReopen) { Beats.reopen(false); return; }
@@ -4331,7 +4468,7 @@ el.search.addEventListener('keydown', e => {
 });
 el.btnNew.addEventListener('click', () => Menu.open(el.btnNew, state.sideMode === 'music' ? [
   { label: 'Add Files…', icon: 'music', onClick: () => el.fileAudio.click() },
-  { label: 'Add YouTube Link…', icon: 'screen', onClick: async () => { const v = await alertPrompt({ title: 'YouTube Link', placeholder: 'Paste a link', ok: 'Add' }); if (v) Player.addLink(v); } },
+  { label: 'Add Link…', icon: 'screen', onClick: promptLink },
   ...(FS.supported ? [{ label: Beats.handle ? 'Change Music Folder…' : 'Choose Music Folder…', icon: 'folder', onClick: () => Beats.pick() }] : []),
 ] : [
   { label: 'New Lyric', icon: 'doc', onClick: createFile },
@@ -4504,7 +4641,7 @@ const Library = {
       for (const r of recs) {
         const o = {};
         if (r.beat) {
-          o.beat = r.beat.kind === 'yt' ? { kind: 'youtube', id: r.beat.id, name: r.beat.name || '' } : { kind: 'file', name: r.beat.name || '' };
+          o.beat = r.beat.kind === 'yt' ? { kind: 'youtube', id: r.beat.id, name: r.beat.name || '' } : r.beat.kind === 'sc' ? { kind: 'soundcloud', url: r.beat.url, name: r.beat.name || '' } : { kind: 'file', name: r.beat.name || '' };
           if (r.time) o.position = this.r1(r.time);
           if (r.loopA != null) o.loopA = this.r1(r.loopA);
           if (r.loopB != null) o.loopB = this.r1(r.loopB);
@@ -4529,9 +4666,9 @@ const Library = {
       if (v.t) o.position = v.t;
       if (Object.keys(o).length) songs[k] = o;
     }
-    const youtube = {};
-    for (const it of Player.items) if (it.kind === 'yt') youtube[it.id] = it.name;
-    return { lyrics, songs, youtube };
+    const youtube = {}, soundcloud = {};
+    for (const it of Player.items) { if (it.kind === 'yt') youtube[it.id] = it.name; else if (it.kind === 'sc') soundcloud[it.url] = it.name; }
+    return { lyrics, songs, youtube, soundcloud };
   },
   // Bring the file's records into this browser where they are newer than (or missing from) what it has.
   async import(parsed) {
@@ -4548,6 +4685,7 @@ const Library = {
         const b = o.beat;
         if (b && typeof b === 'object') {
           if (b.kind === 'youtube' && /^[A-Za-z0-9_-]{11}$/.test(String(b.id || ''))) rec.beat = { kind: 'yt', id: String(b.id), name: String(b.name || 'YouTube video') };
+          else if (b.kind === 'soundcloud' && parseSoundCloud(b.url)) rec.beat = { kind: 'sc', url: parseSoundCloud(b.url), name: String(b.name || 'SoundCloud track') };
           else if (b.kind === 'file' && b.name) rec.beat = { kind: 'file', name: String(b.name), handle: (cur && cur.beat && cur.beat.kind !== 'yt' && cur.beat.name === String(b.name) && cur.beat.handle) || null };
           if (rec.beat) {
             if (typeof o.position === 'number') rec.time = o.position;
@@ -4588,9 +4726,19 @@ const Library = {
       let added = false;
       for (const [id, name] of Object.entries(Y)) {
         if (!/^[A-Za-z0-9_-]{11}$/.test(id) || Player.items.some(x => x.kind === 'yt' && x.id === id)) continue;
-        Player.items.push({ kind: 'yt', id, name: String(name || 'YouTube video'), file: null, handle: null }); added = true;
+        Player.items.push({ kind: 'yt', id, name: String(name || 'YouTube video'), file: null, handle: null, custom: !!name }); added = true;
       }
-      if (added) { LS.set('lyr:yt', Player.items.filter(x => x.kind === 'yt').map(x => ({ id: x.id, name: x.name }))); Player.render(); }
+      if (added) { Player.saveLinks(); Player.render(); }
+    }
+    const C = parsed.soundcloud;
+    if (C && typeof C === 'object' && !Array.isArray(C)) {
+      let added = false;
+      for (const [raw, name] of Object.entries(C)) {
+        const url = parseSoundCloud(raw);
+        if (!url || Player.items.some(x => x.kind === 'sc' && x.url === url)) continue;
+        Player.items.push({ kind: 'sc', url, name: String(name || 'SoundCloud track'), file: null, handle: null, custom: !!name }); added = true;
+      }
+      if (added) { Player.saveLinks(); Player.render(); }
     }
     return changed;
   },
@@ -4602,7 +4750,7 @@ const SettingsFile = {
   snapshot() { const o = {}; for (const k of this.keys()) o[k] = settings[k] === undefined ? DEFAULTS[k] : settings[k]; return o; },
   async body() {
     const lib = await Library.snapshot();
-    return YAML.stringify(Object.assign(this.snapshot(), { lyrics: lib.lyrics, songs: lib.songs, youtube: lib.youtube }));
+    return YAML.stringify(Object.assign(this.snapshot(), { lyrics: lib.lyrics, songs: lib.songs, youtube: lib.youtube, soundcloud: lib.soundcloud }));
   },
   async handle(create) { if (!FS.handle) return null; try { return await FS.handle.getFileHandle(this.name, { create: !!create }); } catch { return null; } },
   schedule() {
