@@ -22,7 +22,7 @@
     --ease: cubic-bezier(.32,.72,0,1);
     --dur: .32s;
     --sidebar-w: clamp(250px, 28vw, 320px); --toolbar-h: 49px; --nav-h: 52px;
-    --editor-size: 18px; --editor-lh: 1.55; --editor-line: 28px; --gutter-w: 48px; --wave-h: 44px;
+    --editor-size: 18px; --editor-lh: 1.55; --editor-line: 28px; --gutter-w: 48px; --now-h: 24px; --wave-h: 68px;   /* wave bar = now-playing row + 44px waveform */
     --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
     color-scheme: dark;
   }
@@ -145,6 +145,7 @@
   .icon-btn { width: 32px; height: 32px; border-radius: 50%; background: var(--fill-2); border: 0; color: var(--accent); display: grid; place-items: center; cursor: pointer; flex: none; }
   .icon-btn:hover { background: var(--fill); }
   .icon-btn svg { width: 18px; height: 18px; }
+  .side-close { display: none; }   /* phones only: closes the list and shows the lyric */
   .banner {
     display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 8px 16px;
     background: rgba(255,159,10,.14); font-size: 14px; border-bottom: 1px solid var(--separator);
@@ -239,7 +240,9 @@
   .counts { position: absolute; right: 16px; bottom: calc(var(--toolbar-h) + var(--wave-h) + 8px + var(--safe-b)); font-size: 12px; color: var(--label-3); font-variant-numeric: tabular-nums; pointer-events: none; text-align: right; }
 
   /* Always-visible waveform bar */
-  .wavebar { height: var(--wave-h); flex: none; position: relative; display: flex; align-items: stretch; background: rgba(var(--bg-rgb), .45); border-top: 1px solid var(--separator); }
+  .wavebar { height: var(--wave-h); flex: none; position: relative; display: flex; flex-direction: column; background: rgba(var(--bg-rgb), .45); border-top: 1px solid var(--separator); }
+  .now-row { height: var(--now-h); flex: none; display: flex; align-items: center; padding: 0 8px; min-width: 0; }   /* the now-playing pill lives here, never over the waveform */
+  .wave-row { flex: 1; min-height: 0; display: flex; align-items: stretch; border-top: 1px solid var(--separator); }
   .wave-main { position: relative; flex: 1; min-width: 0; }
   .wave-vol { display: flex; align-items: center; gap: 4px; padding: 0 10px 0 6px; border-left: 1px solid var(--separator); flex: none; }
   .vol-btn { width: 30px; height: 30px; border: 0; background: none; color: var(--label-2); display: grid; place-items: center; cursor: pointer; border-radius: 8px; padding: 0; }
@@ -248,8 +251,8 @@
   .wavebar canvas, .pl-wave canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: pointer; touch-action: none; }
   .wave-time { position: absolute; bottom: 3px; font-size: 10px; color: var(--label-3); font-variant-numeric: tabular-nums; pointer-events: none; }
   .wave-time.l { left: 8px; } .wave-time.r { right: 8px; }
-  /* Now-playing pill on the waveform bar: the current track is one tap from the Beat sheet on every screen size */
-  .now-pill { position: absolute; top: 4px; left: 8px; max-width: min(62%, 340px); height: 18px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px 0 6px; border-radius: 9px; border: 0; background: rgba(var(--bg-rgb), .72); color: var(--label-2); font: inherit; font-size: 11px; line-height: 18px; cursor: pointer; z-index: 1; }
+  /* Now-playing pill in its own row above the waveform: the current track is one tap from the Beat sheet on every screen size */
+  .now-pill { position: relative; max-width: min(72%, 400px); height: 18px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px 0 6px; border-radius: 9px; border: 0; background: rgba(var(--bg-rgb), .72); color: var(--label-2); font: inherit; font-size: 11px; line-height: 18px; cursor: pointer; }
   .now-pill span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .now-pill svg { width: 12px; height: 12px; flex: none; }
   .now-pill.playing { color: var(--label); }
@@ -459,9 +462,12 @@
     /* Hand-drawn outlines: each corner is an ellipse with one long and one short radius, so edges bow slightly like a
        quick marker stroke instead of turning in Apple's uniform arcs. Short radii stay under the 14px content padding. */
     --hand-card: 10px 180px 12px 200px / 200px 10px 180px 12px;
-    --hand-btn: 8px 90px 8px 100px / 100px 8px 90px 8px;
-    --hand-field: 8px 120px 8px 130px / 12px 60px 10px 70px;
-    --hand-chip: 6px 26px 6px 26px / 26px 6px 26px 6px;
+    /* Small controls keep the same proportions as the cards: the short radius never scales below about 6px, so corners
+       stay softly squared instead of sharpening into blade tips. (Radii larger than an element shrink together, so the
+       sums along each side are kept under the height of a 30px control.) */
+    --hand-btn: 7px 44px 7px 48px / 24px 7px 26px 7px;
+    --hand-field: 7px 34px 7px 38px / 20px 7px 22px 7px;
+    --hand-chip: 6px 18px 6px 20px / 16px 6px 18px 6px;
     --hand-blob: 46% 54% 42% 58% / 56% 44% 58% 42%;
     --hand-sheet: 220px 40px 0 0 / 16px 22px 0 0;
     --radius: var(--hand-card);
@@ -557,13 +563,13 @@
   html[data-style="graffiti"] .grabber { width: 60px; height: 6px; border-radius: 3px; background: var(--accent); transform: skewX(-20deg); }
   html[data-style="graffiti"] .search { border: 2px solid var(--ink); border-radius: var(--hand-field); background: transparent; }
   html[data-style="graffiti"] .side-seg { margin-bottom: 10px; }
-  html[data-style="graffiti"] .mirror .rh, html[data-style="graffiti"] .reader .rh { border-radius: 6px 40px 5px 36px / 36px 5px 40px 6px; }   /* marker-stroke highlights */
+  html[data-style="graffiti"] .mirror .rh, html[data-style="graffiti"] .reader .rh { border-radius: 6px 22px 6px 20px / 14px 6px 16px 6px; }   /* marker-stroke highlights */
   html[data-style="graffiti"] .mirror .rh.pk, html[data-style="graffiti"] .reader .rh.pk { outline: 2px solid var(--ink); }
   html[data-style="graffiti"] .reader { font-weight: 600; }
   html[data-style="graffiti"] .reader .syl, html[data-style="graffiti"] .gutter span { font-family: var(--font-tag); color: var(--accent-2); font-size: 14px; }
   html[data-style="graffiti"] .ta, html[data-style="graffiti"] .mirror { font-weight: 500; }
   html[data-style="graffiti"] button:focus-visible, html[data-style="graffiti"] input:focus-visible, html[data-style="graffiti"] textarea:focus-visible { outline: 3px dashed var(--accent); }
-  html[data-style="graffiti"] kbd { border: 2px solid var(--ink); border-radius: 4px 14px 4px 14px / 14px 4px 14px 4px; font-family: var(--font-display); text-transform: uppercase; color: var(--label); background: transparent; }
+  html[data-style="graffiti"] kbd { border: 2px solid var(--ink); border-radius: 5px 12px 5px 12px / 12px 5px 12px 5px; font-family: var(--font-display); text-transform: uppercase; color: var(--label); background: transparent; }
   html[data-style="graffiti"] .swatch { border-radius: var(--hand-blob); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink); }
   html[data-style="graffiti"] .swatch[aria-pressed="true"]::after { border-radius: 52% 48% 56% 44% / 46% 54% 44% 56%; border: 2px dashed var(--accent); inset: -6px; }
   html[data-style="graffiti"] .pick-swatch { border-radius: var(--hand-blob); box-shadow: 2px 2px 0 var(--ink); }
@@ -595,6 +601,11 @@
     .wave-vol input[type="range"] { width: 64px; }
     .wave-vol { padding: 0 8px 0 4px; }
     .scroll-pill { max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+    .side-close { display: grid; }
+    /* Swipe navigation: while a finger drags, the list floats over the lyric so one can slide away to reveal the other */
+    .app.peek .detail { display: flex; }
+    .app.peek .sidebar { display: flex; position: absolute; top: var(--safe-t); left: 0; bottom: 0; width: 100%; z-index: 6; box-shadow: 8px 0 30px rgba(0,0,0,.35); }
+    .sidebar.slide-anim { transition: transform .26s var(--ease); }
   }
   @media (max-width: 480px) {
     .large-title { font-size: 30px; }
@@ -643,6 +654,7 @@
         <nav class="crumb-path" id="crumbPath" aria-label="Folder path"></nav>
       </div>
       <button class="icon-btn" id="btnNew" title="New lyric or folder (Alt+N for a lyric)" aria-label="New lyric or folder"><span data-icon="plus"></span></button>
+      <button class="icon-btn side-close" id="btnSideClose" title="Close the list and show the lyric" aria-label="Close the list and show the lyric"><span data-icon="xmark"></span></button>
     </div>
     <div class="seg side-seg" id="sideMode"><button data-mode="lyrics" aria-pressed="true">Lyrics</button><button data-mode="music" aria-pressed="false">Music</button></div>
     <label class="search"><span class="ico" data-icon="search"></span><input id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false" aria-label="Search"></label>
@@ -719,14 +731,18 @@
       <button class="small-btn" id="pickMode" aria-pressed="false" title="Pick words by tapping, without Ctrl">Pick mode</button>
     </div>
     <div class="wavebar" id="wavebar">
-      <div class="wave-main">
-        <canvas id="wave" aria-label="Track position"></canvas>
+      <div class="now-row">
         <button class="now-pill" id="nowPill" title="Now playing · open the beat player"><span class="ico" id="nowPillIcon" data-icon="music"></span><span id="nowPillText">No beat</span></button>
-        <span class="wave-time l" id="waveCur">0:00</span><span class="wave-time r" id="waveDur">0:00</span>
       </div>
-      <div class="wave-vol">
-        <button class="vol-btn" id="btnMute" aria-label="Mute or unmute" title="Mute (scroll to adjust volume)"><span id="volIcon" data-icon="speaker"></span></button>
-        <input type="range" id="waveVol" min="0" max="100" value="100" aria-label="Volume">
+      <div class="wave-row">
+        <div class="wave-main">
+          <canvas id="wave" aria-label="Track position"></canvas>
+          <span class="wave-time l" id="waveCur">0:00</span><span class="wave-time r" id="waveDur">0:00</span>
+        </div>
+        <div class="wave-vol">
+          <button class="vol-btn" id="btnMute" aria-label="Mute or unmute" title="Mute (scroll to adjust volume)"><span id="volIcon" data-icon="speaker"></span></button>
+          <input type="range" id="waveVol" min="0" max="100" value="100" aria-label="Volume">
+        </div>
       </div>
     </div>
     <footer class="toolbar">
@@ -1714,6 +1730,56 @@ function makeSwipeable(node, onClose, body) {
 }
 $$('.sheet').forEach(s => makeSwipeable(s, () => Sheet.close(), $('.sheet-body', s)));
 makeSwipeable(el.actionSheet, () => el.scrimModal.click());
+
+/* Phone navigation by swipe: the list slides away to the left to reveal the lyric, and a swipe in from the left edge
+   of the lyric brings it back. The × in the list header does the same as the swipe. */
+const SlideNav = {
+  phone() { return matchMedia('(max-width: 760px)').matches; },
+  install() {
+    const sb = el.sidebar, app = el.app;
+    let x0 = 0, y0 = 0, dx = 0, t0 = 0, phase = 0, dir = 0, w = 1;   // dir -1 closes the list, +1 opens it from the lyric
+    const start = (e, d) => {
+      if (!this.phone() || e.touches.length !== 1) { phase = -1; return; }
+      const t = e.touches[0];
+      if (d > 0 && t.clientX > 28) { phase = -1; return; }   // the back gesture starts at the left edge only
+      if (e.target.closest('input, textarea, select, .seg, .stepper, canvas, .drag-ghost')) { phase = -1; return; }
+      x0 = t.clientX; y0 = t.clientY; dx = 0; t0 = Date.now(); dir = d; phase = 1; w = innerWidth || 1;
+    };
+    const move = e => {
+      if (phase <= 0) return;
+      const t = e.touches[0]; dx = t.clientX - x0; const dy = Math.abs(t.clientY - y0);
+      if (phase === 1) {
+        const along = dx * dir;   // movement in the gesture's own direction
+        if (along <= 0 || dy > along) { if (dy > 8 || along < -8) phase = -1; return; }   // vertical or the wrong way: scrolling
+        if (along < 12) return;
+        if (DragList.active) { phase = -1; return; }   // a hold-and-drag reorder owns this touch
+        phase = 2; app.classList.add('peek'); sb.classList.remove('slide-anim');
+      }
+      if (e.cancelable) e.preventDefault();
+      sb.style.transform = `translateX(${dir < 0 ? Math.min(0, dx) : Math.min(0, dx - w)}px)`;
+    };
+    const end = () => {
+      if (phase !== 2) { phase = 0; return; }
+      phase = 0;
+      const along = dx * dir, fast = along / Math.max(1, Date.now() - t0) > .5;
+      const go = along > w * .3 || (along > 40 && fast);
+      sb.classList.add('slide-anim');
+      requestAnimationFrame(() => { sb.style.transform = (go ? dir < 0 : dir > 0) ? 'translateX(-100%)' : 'translateX(0)'; });
+      setTimeout(() => {
+        if (go) { if (dir < 0) showDoc(); else showList(); }
+        app.classList.remove('peek'); sb.classList.remove('slide-anim'); sb.style.transform = '';
+      }, 290);
+    };
+    sb.addEventListener('touchstart', e => start(e, -1), { passive: true });
+    sb.addEventListener('touchmove', move, { passive: false });
+    sb.addEventListener('touchend', end); sb.addEventListener('touchcancel', end);
+    el.detail.addEventListener('touchstart', e => start(e, 1), { passive: true });
+    el.detail.addEventListener('touchmove', move, { passive: false });
+    el.detail.addEventListener('touchend', end); el.detail.addEventListener('touchcancel', end);
+  },
+};
+SlideNav.install();
+el.btnSideClose.addEventListener('click', () => showDoc());
 
 const Menu = {
   items: [],
