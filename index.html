@@ -1,6 +1,15 @@
 <!DOCTYPE html>
 <html lang="en" data-style="graffiti">
 <head>
+  <!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-Y5JSNRDY63"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-Y5JSNRDY63');
+</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src blob: mediastream:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://www.youtube.com https://w.soundcloud.com; base-uri 'none'; form-action 'none'">
@@ -22,7 +31,7 @@
     --ease: cubic-bezier(.32,.72,0,1);
     --dur: .32s;
     --sidebar-w: clamp(250px, 28vw, 320px); --toolbar-h: 49px; --nav-h: 52px;
-    --editor-size: 18px; --editor-lh: 1.55; --editor-line: 28px; --gutter-w: 48px; --now-h: 24px; --wave-h: 68px;   /* wave bar = now-playing row + 44px waveform */
+    --editor-size: 18px; --editor-lh: 1.55; --editor-line: 28px; --gutter-w: 48px; --now-h: 26px; --wave-h: calc(var(--now-h) + 44px);   /* wave bar = now-playing row + 44px waveform */
     --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
     color-scheme: dark;
   }
@@ -74,6 +83,7 @@
   html[data-style="graffiti"] .crumb { font-family: var(--font-tag); font-size: 13px; }
   .back-dir span:last-child { overflow: hidden; text-overflow: ellipsis; }
   .cell.folder .ttl { font-weight: 500; }
+  .cell.up .ico, .cell.up .ttl { color: var(--accent); }   /* the Back row inside a music subfolder */
   .cell.folder .chev svg { width: 16px; height: 16px; color: var(--label-3); }
   .cell.drop, .back-dir.drop { background: rgba(var(--accent-rgb), .22); }
   .cell-more { width: 30px; height: 30px; background: none; color: var(--label-3); flex: none; }
@@ -252,7 +262,7 @@
   .wave-time { position: absolute; bottom: 3px; font-size: 10px; color: var(--label-3); font-variant-numeric: tabular-nums; pointer-events: none; }
   .wave-time.l { left: 8px; } .wave-time.r { right: 8px; }
   /* Now-playing pill in its own row above the waveform: the current track is one tap from the Beat sheet on every screen size */
-  .now-pill { position: relative; max-width: min(72%, 400px); height: 18px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px 0 6px; border-radius: 9px; border: 0; background: rgba(var(--bg-rgb), .72); color: var(--label-2); font: inherit; font-size: 11px; line-height: 18px; cursor: pointer; }
+  .now-pill { position: relative; max-width: min(72%, 400px); height: 20px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px 0 7px; border-radius: 10px; border: 0; background: rgba(var(--bg-rgb), .72); color: var(--label-2); font: inherit; font-size: 11px; line-height: 20px; cursor: pointer; }
   .now-pill span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .now-pill svg { width: 12px; height: 12px; flex: none; }
   .now-pill.playing { color: var(--label); }
@@ -388,6 +398,7 @@
   .seg { display: inline-flex; background: var(--fill-2); border-radius: 9px; padding: 2px; }
   .seg button { font-size: 13px; font-weight: 500; color: var(--label); background: none; border: 0; padding: 6px 12px; border-radius: 7px; cursor: pointer; transition: background .2s; white-space: nowrap; }
   .seg button[aria-pressed="true"] { background: var(--fill); box-shadow: 0 3px 8px rgba(0,0,0,.12); font-weight: 600; }
+  .seg.wrap { flex-wrap: wrap; justify-content: flex-end; }   /* long choice lists fold onto two lines on phones */
   .seg[data-setting="fontSize"] button:nth-child(1) { font-size: 13px; } .seg[data-setting="fontSize"] button:nth-child(2) { font-size: 15px; } .seg[data-setting="fontSize"] button:nth-child(3) { font-size: 18px; }
   .row .ctl { flex-wrap: wrap; justify-content: flex-end; }
   .stepper { display: inline-flex; align-items: center; background: var(--fill-2); border-radius: 8px; }
@@ -397,9 +408,12 @@
   .stepper button, .scroll-pill svg { cursor: pointer; }
   input[type="range"] { accent-color: var(--accent); margin: 0; }
   .ctl input[type="range"] { width: 150px; }
-  .swatches { display: flex; gap: 18px; padding: 14px 14px 12px; overflow-x: auto; scrollbar-width: none; }
-  .swatch-wrap { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 11px; color: var(--label-2); flex: none; }
-  .swatch { width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; position: relative; background: linear-gradient(135deg, var(--sw-bg) 50%, var(--sw-ac) 50%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+  .swatches { padding: 8px 14px 4px; }
+  .swatch-group-title { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--label-3); padding: 8px 0 6px; }
+  .swatch-row { display: flex; flex-wrap: wrap; gap: 14px 16px; padding: 2px 0 10px; }
+  .swatch-wrap { display: flex; flex-direction: column; align-items: center; gap: 7px; font-size: 11px; color: var(--label-2); flex: none; width: 52px; }
+  .swatch-wrap span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .swatch { width: 40px; height: 40px; border-radius: 50%; border: 0; cursor: pointer; position: relative; background: linear-gradient(135deg, var(--sw-bg) 0 54%, var(--sw-ac) 54% 80%, var(--sw-ac2, var(--sw-ac)) 80% 100%); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
   .swatch[aria-pressed="true"]::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid var(--accent); }
   .shortcuts .row { min-height: 40px; padding: 6px 14px; }
   .shortcuts .lbl { font-size: 15px; }
@@ -606,6 +620,10 @@
     .app.peek .detail { display: flex; }
     .app.peek .sidebar { display: flex; position: absolute; top: var(--safe-t); left: 0; bottom: 0; width: 100%; z-index: 6; box-shadow: 8px 0 30px rgba(0,0,0,.35); }
     .sidebar.slide-anim { transition: transform .26s var(--ease); }
+    /* A finger needs more than an 18px pill */
+    :root { --now-h: 32px; }
+    .now-pill { height: 24px; line-height: 24px; font-size: 12px; max-width: 80%; }
+    html[data-style="graffiti"] .now-pill { height: 26px; }
   }
   @media (max-width: 480px) {
     .large-title { font-size: 30px; }
@@ -617,7 +635,7 @@
     .doc-title { font-size: 16px; }
     .sheet-body { padding: 0 12px calc(24px + var(--safe-b)); }
     .row { padding: 8px 12px; }
-    .swatches { padding: 12px 10px; }
+    .swatches { padding: 8px 10px 4px; }
     .pickbar { bottom: calc(var(--toolbar-h) + var(--wave-h) + 8px + var(--safe-b)); padding: 6px 8px; }
     .wave-time { font-size: 9px; }
     .reader.with-syl .rl { padding: 0 26px; }
@@ -625,7 +643,7 @@
     .row .ctl { margin-left: auto; }
     .seg button { padding: 6px 8px; font-size: 12px; }
     .doc-inner { padding: 16px 12px 45vh; }
-    .swatches { gap: 12px; }
+    .swatch-row { gap: 10px 12px; }
     .btn-row .btn { flex: 1 1 100%; }
     .transport { gap: 18px; }
   }
@@ -788,8 +806,8 @@
     <div class="sec-title">Theme</div>
     <div class="inset">
       <div class="row"><div><div class="lbl">Style</div><div class="desc">Graffiti stickers and block letters, or the plain iPhone look</div></div><div class="ctl"><div class="seg" data-setting="uiStyle"><button data-value="graffiti">Graffiti</button><button data-value="ios">iPhone</button></div></div></div>
-      <div class="row"><div><div class="lbl">Lyric font</div><div class="desc">The face used for the lyric text, built in or from your folder</div></div><div class="ctl"><button class="small-btn" id="setLyricFont">Style default</button></div></div>
       <div class="swatches" id="swatches"></div>
+      <div class="row"><div class="desc" id="themeNote"></div></div>
       <div id="customTheme" hidden>
         <div class="row"><div class="lbl">Background</div><div class="ctl"><input type="color" data-color="bg" aria-label="Background color"></div></div>
         <div class="row"><div class="lbl">Cards</div><div class="ctl"><input type="color" data-color="bg2" aria-label="Card color"></div></div>
@@ -799,13 +817,23 @@
         <div class="row"><div class="desc">Colors apply as you pick them.</div><div class="ctl"><button class="small-btn" id="customCopy">Copy Current Look</button></div></div>
       </div>
       <div class="row"><div><div class="lbl">Grain</div><div class="desc">Subtle poster texture</div></div><div class="ctl"><button class="switch" role="switch" data-setting="grain" aria-label="Grain"></button></div></div>
+    </div>
+
+    <div class="sec-title">Text</div>
+    <div class="inset">
+      <div class="row"><div><div class="lbl">Lyric font</div><div class="desc">The face used for the lyric text, built in or from your folder</div></div><div class="ctl"><button class="small-btn" id="setLyricFont">Style default</button></div></div>
       <div class="row"><div><div class="lbl">Text size</div><div class="desc">Presets, or step to any size</div></div><div class="ctl"><div class="seg" data-setting="fontSize"><button data-value="18" aria-label="Regular">A</button><button data-value="21" aria-label="Large">A</button><button data-value="25" aria-label="Extra large">A</button></div><div class="stepper" data-setting="fontSize" data-min="12" data-max="40"><button data-step="-1" aria-label="Smaller">−</button><span class="val"></span><button data-step="1" aria-label="Bigger">+</button></div></div></div>
     </div>
 
-    <div class="sec-title">Visuals</div>
+    <div class="sec-title">Background</div>
     <div class="inset">
-      <div class="row"><div><div class="lbl">Background visuals</div><div class="desc">React to the beat or system audio</div></div><div class="ctl"><button class="switch" role="switch" data-setting="visuals" aria-label="Background visuals"></button></div></div>
+      <div class="row"><div><div class="lbl">Background visuals</div><div class="desc">React to the beat, a take, captured system audio or the metronome</div></div><div class="ctl"><button class="switch" role="switch" data-setting="visuals" aria-label="Background visuals"></button></div></div>
+      <div class="row"><div><div class="lbl">Scene</div><div class="desc" id="sceneDesc"></div></div><div class="ctl"><div class="seg wrap" data-setting="visualMode"><button data-value="haze">Haze</button><button data-value="spectrum">Spectrum</button><button data-value="wall">Wall</button><button data-value="scope">Scope</button></div></div></div>
+      <div class="row"><div><div class="lbl">Colors</div><div class="desc">The theme's accent pair, the accent alone, a slow rainbow, or plain ink</div></div><div class="ctl"><div class="seg wrap" data-setting="visualColor"><button data-value="theme">Theme</button><button data-value="accent">Accent</button><button data-value="rainbow">Rainbow</button><button data-value="ink">Ink</button></div></div></div>
       <div class="row"><div class="lbl">Intensity</div><div class="ctl"><input type="range" min="0" max="100" data-setting="intensity" aria-label="Intensity"></div></div>
+      <div class="row"><div><div class="lbl">Motion</div><div class="desc">How fast the scene drifts and reacts</div></div><div class="ctl"><input type="range" min="0" max="100" data-setting="visualSpeed" aria-label="Motion"></div></div>
+      <div class="row"><div><div class="lbl">Glow</div><div class="desc">Colors add up where they overlap, like light. Dark themes only</div></div><div class="ctl"><button class="switch" role="switch" data-setting="visualGlow" aria-label="Glow"></button></div></div>
+      <div class="row"><div><div class="lbl">Spectrum ribbon</div><div class="desc">A thin equalizer above the toolbar while audio plays</div></div><div class="ctl"><button class="switch" role="switch" data-setting="visualRibbon" aria-label="Spectrum ribbon"></button></div></div>
     </div>
 
     <div class="sec-title">Writing helpers</div>
@@ -833,7 +861,7 @@
     <div class="sec-title">Demos</div>
     <div class="inset">
       <div class="row"><div><div class="lbl">Take format</div><div class="desc">WAV opens in FL Studio and any DAW; compressed is a fraction of the size</div></div><div class="ctl"><div class="seg" data-setting="takeFormat"><button data-value="wav">WAV</button><button data-value="compressed">Compressed</button></div></div></div>
-      <div class="row"><div><div class="lbl">Record the beat too</div><div class="desc">Mixes the playing beat or captured system audio into the take, clean even with headphones on</div></div><div class="ctl"><button class="switch" role="switch" data-setting="takeMixBeat" aria-label="Record the beat too"></button></div></div>
+      <div class="row"><div><div class="lbl">Record the beat too</div><div class="desc">Starts the beat with the take and mixes it in cleanly, headphones or not; YouTube and SoundCloud ask to share this tab’s audio first</div></div><div class="ctl"><button class="switch" role="switch" data-setting="takeMixBeat" aria-label="Record the beat too"></button></div></div>
       <div class="row"><div><div class="lbl">Beat level in takes</div><div class="desc">How loud the beat sits under your voice</div></div><div class="ctl"><input type="range" min="0" max="100" data-setting="takeBeatVol" aria-label="Beat level in takes"></div></div>
     </div>
 
@@ -964,7 +992,7 @@
     </div>
     <div class="sec-title">Recording</div>
     <div class="inset">
-      <div class="row"><div><div class="lbl">Record the beat too</div><div class="desc">Mixes the playing beat or captured system audio into the take, clean even with headphones on</div></div><div class="ctl"><button class="switch" role="switch" data-setting="takeMixBeat" aria-label="Record the beat too"></button></div></div>
+      <div class="row"><div><div class="lbl">Record the beat too</div><div class="desc">Starts the beat with the take and mixes it in cleanly, headphones or not; YouTube and SoundCloud ask to share this tab’s audio first</div></div><div class="ctl"><button class="switch" role="switch" data-setting="takeMixBeat" aria-label="Record the beat too"></button></div></div>
       <div class="row"><div><div class="lbl">Beat level</div><div class="desc">How loud the beat sits under your voice</div></div><div class="ctl"><input type="range" min="0" max="100" data-setting="takeBeatVol" aria-label="Beat level in the take"></div></div>
     </div>
     <div class="sec-title">Takes</div>
@@ -1098,7 +1126,7 @@ $$('[data-icon]').forEach(n => setIcon(n, n.dataset.icon));
    ============================================================ */
 const DEFAULTS = {
   theme: 'graffiti', uiStyle: 'graffiti', lyricFont: 'default', grain: false, fontSize: 18,
-  visuals: true, intensity: 60,
+  visuals: true, intensity: 60, visualMode: 'haze', visualColor: 'theme', visualSpeed: 50, visualGlow: true, visualRibbon: true,
   syllables: true, synizesis: true, linesPerBar: 1,
   rhymes: true, rhymeStrict: 1, rhymeWindow: 'stanza', rhymeLines: 6, internalRhymes: false,
   rhymeEquiv: [], rhymeGroups: [], rhymeIgnore: [],
@@ -1118,17 +1146,34 @@ function saveSettings() { LS.set('lyr:settings', settings); SettingsFile.schedul
 /* ============================================================
    Themes
    ============================================================ */
+/* Palettes. Every dark theme keeps its text near white with a warm or cool cast, and pairs one loud accent with a
+   second that reads on the same background; the light ones are paper, slate and vinyl rather than plain white. */
 const THEMES = {
-  system:   { name: 'System', dark: { bg: '#000000', bg2: '#1C1C1E', bg3: '#2C2C2E', label: '#FFFFFF', accent: '#0A84FF', accent2: '#5E5CE6' },
-                              light: { bg: '#F2F2F7', bg2: '#FFFFFF', bg3: '#F2F2F7', label: '#000000', accent: '#007AFF', accent2: '#5856D6' } },
-  asphalt:  { name: 'Asphalt',  scheme: 'dark',  bg: '#0B0C10', bg2: '#15171C', bg3: '#1E2128', label: '#F2EFE9', accent: '#FFB020', accent2: '#FF6A3D' },
-  neon:     { name: 'Neon',     scheme: 'dark',  bg: '#050308', bg2: '#120A1A', bg3: '#1B1026', label: '#F5F0FF', accent: '#FF2BD6', accent2: '#00E5FF' },
-  brick:    { name: 'Brick',    scheme: 'dark',  bg: '#1A0F0C', bg2: '#2A1712', bg3: '#3A211A', label: '#F6E9E0', accent: '#E2543A', accent2: '#F0B27A' },
-  graffiti: { name: 'Graffiti', scheme: 'dark',  bg: '#111014', bg2: '#1B1A20', bg3: '#25232B', label: '#F2ECE2', accent: '#AEF03C', accent2: '#FF4F98' },
-  subway:   { name: 'Subway',   scheme: 'dark',  bg: '#101317', bg2: '#1A1F26', bg3: '#242B34', label: '#ECEFF3', accent: '#FFD100', accent2: '#EE352E' },
-  concrete: { name: 'Concrete', scheme: 'light', bg: '#D9DADF', bg2: '#EDEEF1', bg3: '#FFFFFF', label: '#1C1C1E', accent: '#FF6A00', accent2: '#3A3D45' },
+  system:   { name: 'System', blurb: 'Follows the device: iPhone blue on black, or on white.',
+              dark: { bg: '#000000', bg2: '#1C1C1E', bg3: '#2C2C2E', label: '#FFFFFF', accent: '#0A84FF', accent2: '#5E5CE6' },
+              light: { bg: '#F2F2F7', bg2: '#FFFFFF', bg3: '#F2F2F7', label: '#000000', accent: '#007AFF', accent2: '#5856D6' } },
+  // Dark
+  graffiti:    { name: 'Graffiti',    scheme: 'dark',  blurb: 'Lime and hot pink on soot. The default.',          bg: '#111014', bg2: '#1B1A20', bg3: '#25232B', label: '#F2ECE2', accent: '#AEF03C', accent2: '#FF4F98' },
+  asphalt:     { name: 'Asphalt',     scheme: 'dark',  blurb: 'Streetlight amber on wet tarmac.',                 bg: '#0B0C10', bg2: '#15171C', bg3: '#1E2128', label: '#F2EFE9', accent: '#FFB020', accent2: '#FF6A3D' },
+  neon:        { name: 'Neon',        scheme: 'dark',  blurb: 'Magenta and cyan signage after midnight.',         bg: '#050308', bg2: '#120A1A', bg3: '#1B1026', label: '#F5F0FF', accent: '#FF2BD6', accent2: '#00E5FF' },
+  midnight:    { name: 'Midnight',    scheme: 'dark',  blurb: 'Electric blue and gold on deep navy.',             bg: '#070B16', bg2: '#0F1526', bg3: '#182036', label: '#E8EDF8', accent: '#4C8DFF', accent2: '#F7B733' },
+  rooftop:     { name: 'Rooftop',     scheme: 'dark',  blurb: 'Sodium orange and violet dusk.',                   bg: '#120C1C', bg2: '#1C1329', bg3: '#281B38', label: '#F3E9F6', accent: '#FF8C42', accent2: '#9B6BFF' },
+  bodega:      { name: 'Bodega',      scheme: 'dark',  blurb: 'Neon yellow and mint on bottle green.',            bg: '#08120E', bg2: '#0F1C15', bg3: '#17281F', label: '#EAF4EC', accent: '#E7FF3C', accent2: '#2FD98A' },
+  brick:       { name: 'Brick',       scheme: 'dark',  blurb: 'Terracotta and sand on a dark brick wall.',        bg: '#1A0F0C', bg2: '#2A1712', bg3: '#3A211A', label: '#F6E9E0', accent: '#E2543A', accent2: '#F0B27A' },
+  vinyl:       { name: 'Vinyl',       scheme: 'dark',  blurb: 'Record-label red and cream on black.',             bg: '#0A0A0A', bg2: '#161616', bg3: '#222222', label: '#F4EFE6', accent: '#E8353E', accent2: '#D9C9A5' },
+  subway:      { name: 'Subway',      scheme: 'dark',  blurb: 'Safety yellow and signal red on steel.',           bg: '#101317', bg2: '#1A1F26', bg3: '#242B34', label: '#ECEFF3', accent: '#FFD100', accent2: '#EE352E' },
+  chrome:      { name: 'Chrome',      scheme: 'dark',  blurb: 'Ice cyan and silver on graphite.',                 bg: '#0E1013', bg2: '#181B20', bg3: '#23272E', label: '#EDF1F5', accent: '#79E0FF', accent2: '#C0C7D1' },
+  velvet:      { name: 'Velvet',      scheme: 'dark',  blurb: 'Rose and gold on plum.',                           bg: '#14080F', bg2: '#200E18', bg3: '#2D1522', label: '#F8ECF1', accent: '#FF5C8A', accent2: '#E3B04B' },
+  ultraviolet: { name: 'Ultraviolet', scheme: 'dark',  blurb: 'Lavender and aqua under blacklight.',              bg: '#0A0614', bg2: '#140C22', bg3: '#1E1331', label: '#EFE9FF', accent: '#B388FF', accent2: '#00F5D4' },
+  ink:         { name: 'Ink',         scheme: 'dark',  blurb: 'White on black and nothing else.',                 bg: '#000000', bg2: '#141414', bg3: '#1F1F1F', label: '#F2F2F2', accent: '#FFFFFF', accent2: '#8E8E93' },
+  // Light
+  paper:       { name: 'Paper',       scheme: 'light', blurb: 'Zine red and ink blue on warm paper.',             bg: '#F4EFE6', bg2: '#FFFDF8', bg3: '#FFFFFF', label: '#1A1714', accent: '#D7263D', accent2: '#1B4965' },
+  concrete:    { name: 'Concrete',    scheme: 'light', blurb: 'Safety orange on poured concrete.',                bg: '#D9DADF', bg2: '#EDEEF1', bg3: '#FFFFFF', label: '#1C1C1E', accent: '#FF6A00', accent2: '#3A3D45' },
+  chalk:       { name: 'Chalk',       scheme: 'light', blurb: 'Cobalt and orange on pale slate.',                 bg: '#E6EAF0', bg2: '#F5F7FA', bg3: '#FFFFFF', label: '#14181F', accent: '#2F6FED', accent2: '#FF6B35' },
+  sticker:     { name: 'Sticker',     scheme: 'light', blurb: 'Hot pink and cyan on white vinyl.',                bg: '#F7F1F8', bg2: '#FFFFFF', bg3: '#FFFFFF', label: '#1D1023', accent: '#FF2E88', accent2: '#00B4D8' },
 };
 const hexToRgb = h => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const hslToRgb = (h, s, l) => { s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l), f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return [f(0), f(8), f(4)].map(v => Math.round(v * 255)); };
 const rgbToHsl = (r, g, b) => {
   r /= 255; g /= 255; b /= 255;
   const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
@@ -1154,10 +1199,10 @@ function resolveTheme(name) {
   if (name === 'custom') {
     const c = customColors();
     const dark = luminance(hexToRgb(c.bg)) < .35;
-    return { name: 'Custom', scheme: dark ? 'dark' : 'light', bg: c.bg, bg2: c.bg2, bg3: mixHex(c.bg2, c.label, .08), label: c.label, accent: c.accent, accent2: c.accent2 };
+    return { name: 'Custom', scheme: dark ? 'dark' : 'light', blurb: 'Your own colors. Pick them below.', bg: c.bg, bg2: c.bg2, bg3: mixHex(c.bg2, c.label, .08), label: c.label, accent: c.accent, accent2: c.accent2 };
   }
   const t = THEMES[name] || THEMES.system;
-  if (t.dark) { const scheme = lightMedia.matches ? 'light' : 'dark'; return Object.assign({ name: t.name, scheme }, t[scheme]); }
+  if (t.dark) { const scheme = lightMedia.matches ? 'light' : 'dark'; return Object.assign({ name: t.name, scheme, blurb: t.blurb }, t[scheme]); }
   return Object.assign({}, t);
 }
 function applyTheme() {
@@ -1168,7 +1213,8 @@ function applyTheme() {
   const labelA = a => `rgba(${lr},${lg},${lb},${a})`;
   r.setProperty('--bg', t.bg); r.setProperty('--bg-2', t.bg2); r.setProperty('--bg-3', t.bg3);
   r.setProperty('--bg-rgb', hexToRgb(t.bg).join(','));
-  r.setProperty('--label', t.label); r.setProperty('--label-2', labelA(.6)); r.setProperty('--label-3', labelA(.3)); r.setProperty('--label-4', labelA(.18));
+  // Secondary text a touch stronger than iOS, and stronger again on light backgrounds, where 30% black reads as fog.
+  r.setProperty('--label', t.label); r.setProperty('--label-2', labelA(dark ? .62 : .66)); r.setProperty('--label-3', labelA(dark ? .34 : .46)); r.setProperty('--label-4', labelA(dark ? .18 : .24));
   r.setProperty('--separator', dark ? 'rgba(84,84,88,.65)' : 'rgba(60,60,67,.36)');
   r.setProperty('--fill', dark ? 'rgba(120,120,128,.32)' : 'rgba(120,120,128,.2)');
   r.setProperty('--fill-2', dark ? 'rgba(120,120,128,.18)' : 'rgba(120,120,128,.12)');
@@ -1185,21 +1231,31 @@ function applyTheme() {
   const mid = a.map((v, i) => Math.round((v + b[i]) / 2));
   $$('.swatch', el.swatches).forEach(s => s.setAttribute('aria-pressed', String(s.dataset.theme === settings.theme)));
   el.customTheme.hidden = settings.theme !== 'custom';
+  el.themeNote.textContent = `${t.name} · ${t.blurb || ''}`;
   if (settings.theme === 'custom') {
     const c = customColors();
     $$('input[type="color"][data-color]', el.customTheme).forEach(i => { const v = c[i.dataset.color].toLowerCase(); if (i.value !== v) i.value = v; });
     const sw = $('.swatch[data-theme="custom"]', el.swatches);
-    if (sw) { sw.style.setProperty('--sw-bg', t.bg); sw.style.setProperty('--sw-ac', t.accent); }
+    if (sw) { sw.style.setProperty('--sw-bg', t.bg); sw.style.setProperty('--sw-ac', t.accent); sw.style.setProperty('--sw-ac2', t.accent2); }
   }
   themeListeners.forEach(fn => fn({ palette: [a, b, mid], dark }));
   if (el.pickColors) buildPickSwatches();
   if (state.doc && !state.editing) renderReader();   // rhyme tints follow the theme in reading view too
 }
+// The picker shows every palette at once, grouped Dark / Light / Auto and yours; each disc carries background, accent and second accent.
 function buildSwatches() {
-  const entries = Object.entries(THEMES).map(([key, t]) => [key, t.name, t.dark ? (lightMedia.matches ? t.light : t.dark) : t]);
-  entries.push(['custom', 'Custom', resolveTheme('custom')]);
-  el.swatches.innerHTML = entries.map(([key, name, v]) =>
-    `<div class="swatch-wrap"><button class="swatch" data-theme="${key}" style="--sw-bg:${v.bg};--sw-ac:${v.accent}" aria-label="${esc(name)} theme"></button><span>${esc(name)}</span></div>`).join('');
+  const colorsOf = key => key === 'custom' ? resolveTheme('custom') : THEMES[key].dark ? (lightMedia.matches ? THEMES[key].light : THEMES[key].dark) : THEMES[key];
+  const disc = key => {
+    const v = colorsOf(key), name = key === 'custom' ? 'Custom' : THEMES[key].name, blurb = key === 'custom' ? v.blurb : THEMES[key].blurb || '';
+    return `<div class="swatch-wrap"><button class="swatch" data-theme="${key}" style="--sw-bg:${v.bg};--sw-ac:${v.accent};--sw-ac2:${v.accent2}" aria-label="${esc(name)} theme" title="${esc(blurb)}"></button><span>${esc(name)}</span></div>`;
+  };
+  const keys = Object.keys(THEMES);
+  const groups = [
+    ['Dark', keys.filter(k => THEMES[k].scheme === 'dark')],
+    ['Light', keys.filter(k => THEMES[k].scheme === 'light')],
+    ['Auto and yours', ['system', 'custom']],
+  ];
+  el.swatches.innerHTML = groups.map(([title, ks]) => `<div class="swatch-group-title">${title}</div><div class="swatch-row">${ks.map(disc).join('')}</div>`).join('');
 }
 el.swatches.addEventListener('click', e => {
   const b = e.target.closest('.swatch'); if (!b) return;
@@ -1971,6 +2027,30 @@ const Sound = {
     if (this.stream) { this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     if (this.streamNode) { try { this.streamNode.disconnect(); } catch { /* ignore */ } this.streamNode = null; }
   },
+  tabStream: null, tabNode: null,
+  // This tab's own sound (embedded YouTube and SoundCloud players included), for mixing into a take. Separate from
+  // system capture: nothing pauses, the visuals are untouched, and it ends with the take.
+  async captureTab() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { toast('Tab audio capture is not available in this browser', 2800); return null; }
+    this.ensure();
+    if (this.tabNode) return this.tabNode;
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true, audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        preferCurrentTab: true, selfBrowserSurface: 'include', systemAudio: 'include', surfaceSwitching: 'exclude', monitorTypeSurfaces: 'exclude',
+      });
+    } catch { return null; }
+    if (!stream.getAudioTracks().length) { stream.getTracks().forEach(t => t.stop()); toast('No audio was shared. Choose this tab and turn on “Share tab audio”.', 4200); return null; }
+    stream.getVideoTracks().forEach(t => t.stop());
+    this.tabStream = stream; this.tabNode = this.ctx.createMediaStreamSource(stream);
+    stream.getAudioTracks()[0].addEventListener('ended', () => { if (this.tabStream === stream) this.stopTabCapture(); });
+    return this.tabNode;
+  },
+  stopTabCapture() {
+    if (this.tabStream) { this.tabStream.getTracks().forEach(t => t.stop()); this.tabStream = null; }
+    if (this.tabNode) { try { this.tabNode.disconnect(); } catch { /* ignore */ } this.tabNode = null; }
+  },
   bands(dt) {
     const a = this.analyser; if (!a) return null;
     a.getByteFrequencyData(this.freq);
@@ -1992,6 +2072,13 @@ const Sound = {
       this.spec[i] = m / 255;
     }
     return out;
+  },
+  // The raw waveform of the current frame, for the oscilloscope scene.
+  waveform() {
+    const a = this.analyser; if (!a) return null;
+    if (!this.timeBuf || this.timeBuf.length !== a.fftSize) this.timeBuf = new Uint8Array(a.fftSize);
+    a.getByteTimeDomainData(this.timeBuf);
+    return this.timeBuf;
   },
 };
 
@@ -2706,6 +2793,8 @@ el.setTap.addEventListener('click', () => Metro.tap());
 /* ============================================================
    Background visuals: quarter-resolution canvas, 30 fps cap
    ============================================================ */
+/* Background scenes. All draw on one quarter-resolution canvas at 30 fps from the same three band levels
+   (bass, mid, high), the 48-band spectrum and, for the scope, the raw waveform; they stop when nothing plays. */
 const Visuals = {
   c2d: null, w: 2, h: 2, palette: [[10, 132, 255], [94, 92, 230], [52, 112, 242]], dark: true,
   running: false, last: 0, silent: 0, raf: 0, sleepTimer: null,
@@ -2715,14 +2804,23 @@ const Visuals = {
     { x: .50, y: .78, r: .50, band: 'bass', c: 2, p: 4.2 },
     { x: .86, y: .80, r: .34, band: 'high', c: 1, p: 1.3 },
   ],
+  SCENES: {
+    haze: 'Soft color clouds that swell with the bass, mids and highs',
+    spectrum: 'Equalizer bars rising from the bottom edge',
+    wall: 'A wall of dots lights up column by column, like an LED board',
+    scope: 'The raw waveform traced across the screen, oscilloscope style',
+  },
   init() {
+    if (!this.scenes[settings.visualMode]) settings.visualMode = 'haze';   // scenes that no longer exist fall back
     this.c2d = el.bg.getContext('2d');
     this.resize();
     addEventListener('resize', () => this.resize());
     themeListeners.push(({ palette, dark }) => { this.palette = palette; this.dark = dark; if (!this.running) this.drawStatic(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.stop(); else if (Sound.active || Metro.on) this.wake(); });
+    this.describe();
     this.applyEnabled();
   },
+  describe() { el.sceneDesc.textContent = this.SCENES[settings.visualMode] || this.SCENES.haze; },
   applyEnabled() {
     el.bg.style.display = settings.visuals ? '' : 'none';
     if (!settings.visuals) this.stop(); else if (!this.running) this.drawStatic();
@@ -2752,32 +2850,87 @@ const Visuals = {
     if (live) this.silent = 0; else { this.silent += dt; if (this.silent > 3) { this.stop(); return; } }
     this.draw(t / 1000, b || { bass: 0, mid: 0, high: 0 }, !!b);
   },
-  draw(time, b, ribbon) {
+  rgba(col, a) { return `rgba(${col[0]},${col[1]},${col[2]},${Math.max(0, a).toFixed(3)})`; },
+  // Colors for the scene: the theme's accent pair, the accent alone, a slow rainbow, or plain ink.
+  colors(t) {
+    const mode = settings.visualColor;
+    if (mode === 'accent') return [this.palette[0], this.palette[0], this.palette[0]];
+    if (mode === 'ink') { const v = this.dark ? 235 : 20; return [[v, v, v], [v, v, v], [v, v, v]]; }
+    if (mode === 'rainbow') { const base = (t * 18) % 360; return [0, 120, 240].map(o => hslToRgb((base + o) % 360, 85, this.dark ? 60 : 45)); }
+    return this.palette;
+  },
+  draw(time, b, live) {
     const c = this.c2d, w = this.w, h = this.h; if (!c) return;
     c.clearRect(0, 0, w, h);
     const I = settings.intensity / 100; if (I <= 0) return;
-    c.globalCompositeOperation = this.dark ? 'lighter' : 'source-over';
+    const t = time * (.3 + clamp(Number(settings.visualSpeed) || 0, 0, 100) / 100 * 1.7);
+    c.globalCompositeOperation = settings.visualGlow && this.dark ? 'lighter' : 'source-over';
     const pulse = Metro.on ? Math.exp(-Metro.phase() * 5) : 0;
-    for (const bl of this.blobs) {
-      const v = b[bl.band] || 0;
-      const x = (bl.x + .06 * Math.sin(time * .11 + bl.p)) * w, y = (bl.y + .05 * Math.cos(time * .09 + bl.p * 1.3)) * h;
-      const r = bl.r * Math.max(w, h) * (.8 + v * .45 + pulse * .12);
-      const [R, G, B] = this.palette[bl.c];
-      const a = I * (this.dark ? .2 + v * .5 : .12 + v * .3);
-      const g = c.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, `rgba(${R},${G},${B},${a.toFixed(3)})`);
-      g.addColorStop(1, `rgba(${R},${G},${B},0)`);
-      c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
-    }
-    if (ribbon) {
-      const vals = Sound.spec, n = vals.length, base = h * .954 - 13, maxH = h * .14;
-      const [R, G, B] = this.palette[0];
-      c.globalCompositeOperation = 'source-over';
-      c.beginPath(); c.moveTo(0, base);
-      for (let i = 0; i < n; i++) c.lineTo((i + .5) / n * w, base - vals[i] * maxH);
-      c.lineTo(w, base); c.closePath();
-      c.fillStyle = `rgba(${R},${G},${B},${(.35 * I).toFixed(3)})`; c.fill();
-    }
+    const pal = this.colors(t);
+    const scene = this.scenes[settings.visualMode] || this.scenes.haze;
+    scene.call(this, c, w, h, t, b, pulse, I, pal, live);
+    if (live && settings.visualRibbon !== false) this.ribbon(c, w, h, I, pal);
+  },
+  ribbon(c, w, h, I, pal) {
+    const vals = Sound.spec, n = vals.length, base = h * .954 - 13, maxH = h * .14;
+    c.globalCompositeOperation = 'source-over';
+    c.beginPath(); c.moveTo(0, base);
+    for (let i = 0; i < n; i++) c.lineTo((i + .5) / n * w, base - vals[i] * maxH);
+    c.lineTo(w, base); c.closePath();
+    c.fillStyle = this.rgba(pal[0], .35 * I); c.fill();
+  },
+  scenes: {
+    haze(c, w, h, t, b, pulse, I, pal) {
+      for (const bl of this.blobs) {
+        const v = b[bl.band] || 0;
+        const x = (bl.x + .06 * Math.sin(t * .11 + bl.p)) * w, y = (bl.y + .05 * Math.cos(t * .09 + bl.p * 1.3)) * h;
+        const r = bl.r * Math.max(w, h) * (.8 + v * .45 + pulse * .12);
+        const a = I * (this.dark ? .2 + v * .5 : .12 + v * .3);
+        const g = c.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, this.rgba(pal[bl.c], a)); g.addColorStop(1, this.rgba(pal[bl.c], 0));
+        c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+    },
+    spectrum(c, w, h, t, b, pulse, I, pal, live) {
+      const vals = Sound.spec, n = vals.length, bw = w / n, top = h * .38;
+      for (let i = 0; i < n; i++) {
+        const v = clamp(live ? vals[i] * (1 + pulse * .3) : .08 + .1 * (1 + Math.sin(i * .55 + t * 1.5)) / 2, 0, 1);
+        const bh = Math.max(1, v * (h - top)), y = h - bh;
+        const g = c.createLinearGradient(0, y, 0, h);
+        g.addColorStop(0, this.rgba(pal[1], I * (.25 + v * .55))); g.addColorStop(1, this.rgba(pal[0], I * (.18 + v * .35)));
+        c.fillStyle = g; c.fillRect(i * bw + .5, y, Math.max(1, bw - 1), bh);
+      }
+    },
+    wall(c, w, h, t, b, pulse, I, pal, live) {
+      const cols = Math.max(8, Math.round(w / 12)), rows = Math.max(6, Math.round(h / 12));
+      const cw = w / cols, ch = h / rows, vals = Sound.spec, n = vals.length, rad = Math.min(cw, ch) * .27;
+      for (let i = 0; i < cols; i++) {
+        const v = clamp(live ? vals[Math.floor(i / cols * n)] * (1 + pulse * .3) : .12 + .12 * (1 + Math.sin(i * .5 + t)) / 2, 0, 1);
+        const lit = Math.round(v * rows);
+        for (let j = 0; j < rows; j++) {
+          const on = j >= rows - lit, tip = on && j < rows - lit + 2;
+          c.fillStyle = this.rgba(tip ? pal[1] : on ? pal[0] : pal[2], on ? I * .55 : I * .07);
+          c.beginPath(); c.arc((i + .5) * cw, (j + .5) * ch, on ? rad * 1.2 : rad, 0, Math.PI * 2); c.fill();
+        }
+      }
+    },
+    scope(c, w, h, t, b, pulse, I, pal, live) {
+      const buf = live ? Sound.waveform() : null, n = buf ? buf.length : 256;
+      const cy = h * .46, amp = h * .22 * (.6 + I * .6) * (1 + pulse * .4);
+      c.lineJoin = 'round';
+      const trace = (col, a, lw, scale, phase) => {
+        c.strokeStyle = this.rgba(col, a); c.lineWidth = lw; c.beginPath();
+        for (let i = 0; i < n; i++) {
+          const s = buf ? (buf[i] - 128) / 128 : .18 * Math.sin(i / n * Math.PI * 4 + t * 2 + phase);
+          const x = i / (n - 1) * w, y = cy + s * amp * scale;
+          if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+        }
+        c.stroke();
+      };
+      trace(pal[0], I * .18, Math.max(2, w / 120), 1, 0);     // soft body
+      trace(pal[0], I * .85, Math.max(1, w / 400), 1, 0);     // crisp line
+      trace(pal[1], I * .35, Math.max(1, w / 400), -.6, 1.2); // second voice, mirrored
+    },
   },
   drawStatic() {
     this.draw(0, { bass: .3, mid: .3, high: .3 }, false);
@@ -4020,12 +4173,15 @@ const Music = {
       el.musicChoose.textContent = Beats.needsReopen ? 'Reopen Music Folder' : 'Choose Music Folder…';
     } else {
       const ps = this.pathStr();
+      // Inside a subfolder the list starts with a Back row, so leaving it never depends on the header button
+      const parent = this.path.length > 1 ? this.path[this.path.length - 2] : (Beats.handle ? Beats.handle.name : 'Music');
+      const up = this.path.length ? `<li class="cell folder up" data-mup role="button" tabindex="0" title="Go back to “${esc(parent)}”"><span class="ico">${ICONS.chevUp}</span><div class="txt"><div class="ttl">Back</div><div class="sub">Up to “${esc(parent)}”</div></div></li>` : '';
       const folders = this.folders.filter(f => hit(f.name)).map(f => `<li class="cell folder" data-mdir="${esc(f.name)}" role="button" tabindex="0"><span class="ico">${ICONS.folder}</span><div class="txt"><div class="ttl" title="${esc(f.name)}">${esc(f.name)}</div><div class="sub">${f.count == null ? 'Folder' : plural(f.count, 'track')}</div></div><span class="ico chev">${ICONS.chev}</span></li>`);
       const tracks = this.tracks.filter(t => hit(t.name)).map(t => {
         const active = !!cur && cur.fromFolder && cur.folderPath === ps && cur.fileName === t.name;
         return `<li class="cell track${active ? ' active' : ''}" data-mtrack="${esc(t.name)}" role="button" tabindex="0"><span class="ico">${active ? stateIcon() : ICONS.music}</span><div class="txt"><div class="ttl" title="${esc(t.name)}">${esc(t.name.replace(/\.[^.]+$/, ''))}</div><div class="sub">${esc(t.name.split('.').pop().toUpperCase())}</div></div><button class="icon-btn cell-more" data-mmore="${esc(t.name)}" aria-label="Track options" title="Track options">${ICONS.more}</button></li>`;
       });
-      el.musicList.innerHTML = folders.join('') + tracks.join('');
+      el.musicList.innerHTML = up + folders.join('') + tracks.join('');
       el.musicEmpty.hidden = !!(folders.length || tracks.length);
       el.musicEmpty.textContent = q ? 'No matches in this folder' : 'No audio files or folders here.';
       el.musicActions.hidden = true;
@@ -4046,7 +4202,8 @@ el.musicScroll.addEventListener('click', e => {
   const lm = e.target.closest('[data-mlink]'); if (lm) { e.stopPropagation(); Player.linkMenu(lm, +lm.dataset.mlink); return; }
   const rm = e.target.closest('[data-mremove]'); if (rm) { e.stopPropagation(); Player.removeItem(+rm.dataset.mremove); return; }
   const c = e.target.closest('.cell'); if (!c) return;
-  if (c.dataset.mdir != null) Music.navigate(Music.path.concat(c.dataset.mdir));
+  if (c.dataset.mup != null) Music.up();
+  else if (c.dataset.mdir != null) Music.navigate(Music.path.concat(c.dataset.mdir));
   else if (c.dataset.mtrack != null) Music.playTrack(c.dataset.mtrack);
   else if (c.dataset.mitem != null) { const i = +c.dataset.mitem; if (i === Player.idx) Player.toggle(); else Player.play(i); }
   else if (c.dataset.mtake != null) Demos.play(+c.dataset.mtake);
@@ -4443,7 +4600,8 @@ function onSettingChange(key) {
     case 'grain': el.grain.hidden = !settings.grain; break;
     case 'fontSize': applyEditorSize(); queueRender(); break;
     case 'visuals': Visuals.applyEnabled(); if (settings.visuals && (Sound.active || Metro.on)) Visuals.wake(); break;
-    case 'intensity': if (!Visuals.running) Visuals.drawStatic(); break;
+    case 'intensity': case 'visualSpeed': case 'visualGlow': case 'visualRibbon': case 'visualColor': if (!Visuals.running) Visuals.drawStatic(); break;
+    case 'visualMode': Visuals.describe(); if (!Visuals.running) Visuals.drawStatic(); break;
     case 'syllables': root.setProperty('--gutter-w', settings.syllables ? '48px' : '0px'); queueRender(); if (!state.editing) renderReader(); break;
     case 'synizesis': case 'rhymes': case 'rhymeStrict': case 'rhymeWindow': case 'rhymeLines': case 'internalRhymes': case 'linesPerBar': queueRender(); if (!state.editing) renderReader(); break;
     case 'metroBpm': case 'metroSub': case 'metroAccent': case 'metroVol': Metro.render(); break;
@@ -5058,14 +5216,11 @@ function encodeWav(pcm, channels, sampleRate) {
 const Demos = {
   rec: null, chunks: [], stream: null, startAt: 0, timer: null, mime: '', ext: 'webm', doc: null, mix: null,
   list: [], playing: null, url: null, meter: null, meterRaf: 0,
-  // "Record the beat too": the node carrying the beat, so it can be mixed into a take at its own level.
-  // Files and takes come from the player's audio element; system capture from its stream. Embedded YouTube and SoundCloud players keep their audio to themselves.
-  beatSource() {
-    if (Sound.capturing && Sound.streamNode) return Sound.streamNode;
-    const it = Player.current();
-    if (!it || Player.isWebItem(it)) return null;
-    Sound.connectPlayer();
-    return Sound.mediaNode;
+  // "Record the beat too": start the beat together with the take, from the loop start when a loop is set, otherwise from where it stands.
+  cueBeat() {
+    const it = Player.current(); if (!it) return;
+    if (Player.isWebItem(it)) { const w = Player.webFor(it); if (!w.playing) { if (Player.loopA != null) w.seek(Player.loopA); w.play(); } return; }
+    if (el.audio.paused) { if (Player.loopA != null) el.audio.currentTime = Player.loopA; el.audio.play().catch(() => {}); }
   },
   beatLevel() { return clamp(Number(settings.takeBeatVol) || 0, 0, 100) / 100; },
   applyBeatVol() { const g = (this.rec && this.rec.beatGain) || (this.mix && this.mix.beatGain); if (g) g.gain.value = this.beatLevel(); },
@@ -5142,8 +5297,8 @@ const Demos = {
     el.demoEmpty.hidden = this.list.length > 0 || !d;
     const t = this.pickType();
     const mixNote = settings.takeMixBeat
-      ? ` The playing beat is mixed in at ${clamp(Number(settings.takeBeatVol) || 0, 0, 100)}%: local files, takes and captured system audio, not YouTube or SoundCloud. Use headphones so the microphone does not pick the beat up a second time.`
-      : ' Switch on “Record the beat too” to mix the playing beat into the take at its own level.';
+      ? ` Record starts the beat with the take and mixes it in at ${clamp(Number(settings.takeBeatVol) || 0, 0, 100)}%. YouTube and SoundCloud go through the browser’s share dialog first: choose this tab and turn on “Share tab audio”. Use headphones so the microphone does not pick the beat up a second time.`
+      : ' Switch on “Record the beat too” to start the beat with the take and mix it in at its own level.';
     el.demoNote.textContent = !ok ? '' : (this.wavMode()
       ? 'Takes are saved as 16-bit WAV in the folder’s “demos” folder, ready for FL Studio or any DAW (about 5–6 MB per minute, mono; stereo when the beat is mixed in). Settings › Demos switches to small compressed files.'
       : `Takes are saved compressed (.${t.ext}, ${t.ext === 'm4a' ? 'AAC' : 'Opus'}) in the folder’s “demos” folder. Settings › Demos switches to WAV for DAW-ready files; existing takes can be converted from their menu.`) + mixNote;
@@ -5152,12 +5307,24 @@ const Demos = {
   async start() {
     const d = state.doc; if (!d || this.rec) return;
     if (!this.supported()) { toast('Recording is not available in this browser'); return; }
+    // "Record the beat too": settle where the beat's signal comes from before asking for the microphone, while the click still counts as a gesture.
+    // Files and takes come straight from the player. Captured system audio is used as is. Embedded YouTube and SoundCloud
+    // players keep their sound to themselves, so the browser's share dialog hands over this tab's audio for the length of the take.
+    let beat = null, note = '';
+    if (settings.takeMixBeat) {
+      const it = Player.current();
+      if (Sound.capturing && Sound.streamNode) beat = Sound.streamNode;
+      else if (!it) note = 'No beat is loaded, so only the microphone is recorded';
+      else if (Player.isWebItem(it)) {
+        beat = await Sound.captureTab();
+        if (!beat) note = 'Only the microphone is recorded. To include the video, choose this tab in the share dialog and turn on “Share tab audio”.';
+      } else { Sound.connectPlayer(); beat = Sound.mediaNode; }
+    }
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true } }); }
-    catch (e) { console.warn(e); toast(e && e.name === 'NotAllowedError' ? 'Microphone access was not allowed' : 'No microphone is available', 3200); return; }
+    catch (e) { console.warn(e); Sound.stopTabCapture(); toast(e && e.name === 'NotAllowedError' ? 'Microphone access was not allowed' : 'No microphone is available', 3200); return; }
     this.stream = stream; this.chunks = []; this.startAt = Date.now(); this.doc = d;
-    const beat = settings.takeMixBeat ? this.beatSource() : null;
-    if (settings.takeMixBeat && !beat) toast(Player.isWeb() ? 'YouTube and SoundCloud audio can’t be mixed into a take, so only the microphone is recorded' : 'No beat is loaded, so only the microphone is recorded', 3000);
+    if (note) toast(note, 3600);
     if (this.wavMode()) {
       // Raw PCM straight from the microphone (plus the beat, when mixed in), quantized to 16-bit as it arrives; written as WAV on stop.
       const ctx = Sound.ensure(), track = stream.getAudioTracks()[0];
@@ -5169,7 +5336,7 @@ const Demos = {
         proc = ctx.createScriptProcessor(4096, channels, 1);
         mute = ctx.createGain(); mute.gain.value = 0;
         if (beat) { beatGain = ctx.createGain(); beatGain.gain.value = this.beatLevel(); beat.connect(beatGain); beatGain.connect(proc); }
-      } catch (e) { console.warn(e); stream.getTracks().forEach(x => x.stop()); this.stream = null; toast('Could not start the recorder'); return; }
+      } catch (e) { console.warn(e); Sound.stopTabCapture(); stream.getTracks().forEach(x => x.stop()); this.stream = null; toast('Could not start the recorder'); return; }
       const pcm = Array.from({ length: channels }, () => []);
       proc.onaudioprocess = e => { for (let c = 0; c < channels; c++) pcm[c].push(toInt16(e.inputBuffer.getChannelData(c))); };
       src.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
@@ -5188,13 +5355,14 @@ const Demos = {
         } catch (e) { console.warn(e); this.mix = null; }
       }
       try { rec = new MediaRecorder(recStream, t.mime ? { mimeType: t.mime, audioBitsPerSecond: 96000 } : undefined); }
-      catch (e) { console.warn(e); this.unmix(); stream.getTracks().forEach(x => x.stop()); this.stream = null; toast('Could not start the recorder'); return; }
+      catch (e) { console.warn(e); this.unmix(); Sound.stopTabCapture(); stream.getTracks().forEach(x => x.stop()); this.stream = null; toast('Could not start the recorder'); return; }
       this.rec = rec;
       rec.addEventListener('dataavailable', e => { if (e.data && e.data.size) this.chunks.push(e.data); });
       rec.addEventListener('stop', () => this.finish());
       rec.addEventListener('error', e => { console.warn(e); toast('Recording error'); });
       rec.start(1000);
     }
+    if (beat && beat !== Sound.streamNode) this.cueBeat();   // the take and the beat start together
     el.tbRecTime.hidden = false;
     this.timer = setInterval(() => { const t = fmtTime((Date.now() - this.startAt) / 1000); el.recTime.textContent = t; el.tbRecTime.textContent = t; }, 250);
     this.startMeter(stream);
@@ -5209,7 +5377,7 @@ const Demos = {
   teardown() {
     clearInterval(this.timer); this.timer = null; this.stopMeter();
     const seconds = (Date.now() - this.startAt) / 1000, doc = this.doc;
-    this.rec = null; this.unmix();
+    this.rec = null; this.unmix(); Sound.stopTabCapture();
     if (this.stream) { this.stream.getTracks().forEach(x => x.stop()); this.stream = null; }
     el.recTime.textContent = '0:00'; el.recLevel.style.width = '0';
     el.tbRecTime.hidden = true; el.tbRecTime.textContent = '0:00';
